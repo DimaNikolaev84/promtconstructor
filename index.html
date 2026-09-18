@@ -1118,5 +1118,942 @@ $("txt").onclick=()=>{
 window.addEventListener("pagehide",saveLocal);
 render();
 </script>
+  <!-- Дополнение к frame-scheme-v2: композиция, размер, свет -->
+<style>
+.comp-switch{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+}
+.comp-switch input{width:20px;height:20px;accent-color:var(--accent)}
+.comp-section{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+.comp-section summary{cursor:pointer;font-weight:600}
+.comp-item{
+  padding:10px 0;border-bottom:1px solid #ffffff0c;
+}
+.comp-item label{
+  display:flex;align-items:flex-start;gap:9px;
+  color:var(--text);font-size:13px;margin:0;cursor:pointer;
+}
+.comp-item input{
+  width:17px;height:17px;flex-shrink:0;margin-top:3px;
+  accent-color:var(--accent);
+}
+.comp-desc{margin:4px 0 0 26px;font-size:11px;color:var(--muted)}
+.comp-example{margin:6px 0 0 26px;font-size:11px}
+.comp-example summary{font-weight:400;color:var(--muted)}
+.comp-example p{overflow-wrap:anywhere}
+.comp-chip{
+  border-radius:20px;font-size:11px;padding:5px 9px;
+}
+.comp-disabled{opacity:.55}
+.comp-note{margin-top:9px;font-size:12px;color:#e2c58e}
+#compSelected{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+#compResults{max-height:580px;overflow:auto;padding-right:4px}
+#compPresets{margin-top:10px}
+#compPresets button{font-size:11px}
+.comp-extra{padding:9px 0;color:var(--muted);font-size:12px}
+</style>
+
+<script>
+(()=>{
+"use strict";
+
+/*
+  Это дополнение использует функции и состояние версии 2.
+  Не вставляйте его внутрь существующего <script>.
+*/
+if(document.getElementById("compositionPanel"))return;
+
+// [id, название, Midjourney, Nano Banana, эффект, референс]
+const GROUPS=[
+{
+  title:"1. Геометрия и структура кадра",
+  items:[
+    ["thirds","Правило третей",
+      "rule of thirds, subject on left third",
+      "The subject is positioned on the left third of the frame, leaving open space ahead of them.",
+      "Асимметрия и воздух по направлению взгляда","Универсально"],
+    ["symmetry","Центральная симметрия",
+      "centered symmetrical composition, formal framing",
+      "Use a perfectly centered, symmetrical composition, with the figure in the exact middle of the frame.",
+      "Монументальность, торжественность","Fan Ho"],
+    ["golden","Золотое сечение",
+      "golden ratio composition, spiral flow",
+      "Use a golden-ratio balance, guiding the eye in a spiral from the corner toward the subject.",
+      "Плавное движение взгляда","Классика"],
+    ["diagonal","Диагональная композиция",
+      "strong diagonal composition, dynamic tension",
+      "Build the scene on a strong diagonal running from lower left to upper right.",
+      "Движение, энергия, напряжение","Родченко"],
+    ["triangle","Треугольники",
+      "triangular composition, three figures forming a triangle",
+      "Arrange three figures in a loose triangle, creating structural stability within the street's chaos.",
+      "Устойчивость в хаосе улицы","Cartier-Bresson"],
+    ["low_horizon","Горизонт низко",
+      "horizon on lower third, dominant sky",
+      "Keep the horizon on the lower third, with a vast dramatic sky dominating the frame.",
+      "Небо как герой, масштаб","Пейзажный стрит"],
+    ["high_horizon","Горизонт высоко",
+      "high horizon line, emphasis on street surface",
+      "Use a high horizon so that wet asphalt and shadows fill most of the frame.",
+      "Фактура земли и отражения","Leiter"],
+    ["clean_edges","Чистые края кадра",
+      "clean frame edges, disciplined edge composition",
+      "Compose the frame edges carefully, avoiding accidental cuts and distracting clutter touching the borders.",
+      "Собранность и дисциплина","Winogrand"]
+  ]
+},
+{
+  title:"2. Линии и управление взглядом",
+  items:[
+    ["leading","Ведущие линии",
+      "leading lines toward the subject, converging perspective",
+      "Let tram rails and building edges converge as leading lines toward the lone figure.",
+      "Направление взгляда к герою","Cartier-Bresson"],
+    ["s_curve","S-кривая",
+      "S-curve street winding through frame",
+      "Let a wet cobblestone street curve in a soft S-shape into the fog.",
+      "Плавность и лиричность","Пейзажный стрит"],
+    ["verticals","Сходящиеся вертикали",
+      "converging verticals, towering buildings",
+      "Look upward so the buildings' verticals converge above the small figure below.",
+      "Давление города на человека","Fan Ho"],
+    ["gaze_out","Направление взгляда героя",
+      "subject gazing out of frame, implied line",
+      "Direct the subject's gaze out of the frame, creating an invisible line for the viewer to follow.",
+      "Недосказанность, история за кадром","Maier"],
+    ["pointing","Указующий жест",
+      "pointing gesture creating visual vector",
+      "Let a stranger's pointing arm form a visual vector across the composition.",
+      "Взгляд следует за жестом","Winogrand"],
+    ["shadow_line","Тень как линия",
+      "long shadow as a leading line",
+      "Use the figure's elongated shadow stretching across the image as the main compositional line.",
+      "Графика и двойник героя","Fan Ho"],
+    ["counterflow","Контрдвижение",
+      "two opposing directions of movement in frame",
+      "Show pedestrians moving in opposite directions, with their paths crossing at the center.",
+      "Напряжение и пульс улицы","Webb"]
+  ]
+},
+{
+  title:"3. Глубина и слои",
+  items:[
+    ["layers","Трёхплановость",
+      "layered composition, foreground, midground, background action, deep focus",
+      "Build three distinct planes: an out-of-focus shoulder in the foreground, the main subject in the middle, and street life unfolding behind.",
+      "Многослойный кадр, организованный хаос","Alex Webb"],
+    ["frame_in_frame","Кадр в кадре",
+      "framed within a doorway, window or arch",
+      "Frame the scene within a dark doorway, with the bright street visible beyond like a stage.",
+      "Театральность и фокус","Webb, Ho"],
+    ["obstruction","Передний план-препятствие",
+      "obstructed foreground, shooting past objects",
+      "Look past a blurred lamppost and passersby, glimpsing the subject between obstacles.",
+      "Подглядывание и присутствие","Leiter"],
+    ["glass","Съёмка сквозь стекло",
+      "through rain-streaked glass, layered reflections",
+      "View the scene through a fogged café window, with neon reflections merging with the figures inside.",
+      "Живописная многослойность","Saul Leiter"],
+    ["near_far","Ближний-дальний",
+      "near-far composition, huge foreground detail, wide angle",
+      "Use a wide-angle near-far composition, with a large coffee cup in the foreground and tiny figures crossing far behind.",
+      "Втягивание зрителя в кадр","28mm-школа"],
+    ["tele","Телекомпрессия",
+      "compressed telephoto perspective, stacked flat layers",
+      "Observe from a distance with a long lens, making the crowd appear as overlapping flat layers.",
+      "Плоскостность и абстракция","Leiter"],
+    ["haze_depth","Атмосферная глубина",
+      "atmospheric depth, haze separating planes",
+      "Let each successive plane fade lighter into the haze, creating natural depth separation.",
+      "Воздух и тональная перспектива","Туманный стрит"],
+    ["middle_focus","Эшелон резкости",
+      "selective focus on middle plane, blurred front and back",
+      "Keep only the middle plane in sharp focus, with foreground and background dissolving into blur.",
+      "Кинематографичный взгляд сквозь слои","Кино-стрит"]
+  ]
+},
+{
+  title:"4. Свето-тональная композиция",
+  items:[
+    ["chiaroscuro","Кьяроскуро",
+      "chiaroscuro, dramatic light-dark contrast",
+      "Use deep chiaroscuro, with the figure emerging from near-total darkness into a blade of light.",
+      "Светотеневая драма","Fan Ho"],
+    ["shaft","Луч света / прожектор",
+      "single shaft of light isolating the subject",
+      "Let a single shaft of sunlight fall between buildings, spotlighting one pedestrian while the surroundings remain in shadow.",
+      "Театральный акцент","Fan Ho"],
+    ["silhouette","Силуэт",
+      "backlit silhouette, no facial detail",
+      "Reduce the figure to a black silhouette against glowing fog, without readable facial detail.",
+      "Анонимность и архетип","Ho, Brandt"],
+    ["figure_ground","Фигура-фон",
+      "strong figure-to-ground separation, subject against clean tonal background",
+      "Separate the dark figure clearly against a bright empty wall, creating strong figure-to-ground contrast.",
+      "Мгновенная читаемость","Универсально"],
+    ["low_key","Низкий ключ",
+      "low-key, dominant shadows, small bright accents",
+      "Keep most of the image in shadow, with only faces and neon catching light.",
+      "Нуар и тайна","Moriyama"],
+    ["high_key","Высокий ключ",
+      "high-key, pale overexposed tones, minimal shadows",
+      "Wash the scene in pale overcast light, with high-key tones and almost no shadows.",
+      "Лёгкость и зимняя тишина","Скандинавский стрит"],
+    ["giant_shadow","Тень больше героя",
+      "giant cast shadow dominating, small figure",
+      "Let an enormous cast shadow occupy half the frame, with its owner appearing as a small figure in the corner.",
+      "Сюрреализм и второй сюжет","Ho, Кертес"],
+    ["window_light","Свет из окна",
+      "single window light, rembrandt-like street portrait",
+      "Use soft directional light from a shop window to sculpt one side of the face while the other falls into shadow.",
+      "Интимный уличный портрет","Maier"]
+  ]
+},
+{
+  title:"5. Ритм, паттерн, повторение",
+  items:[
+    ["rhythm","Ритм",
+      "rhythmic repetition of arches, columns or umbrellas",
+      "Show a rhythmic row of identical arches receding into the distance, with a figure breaking the cadence.",
+      "Музыкальность и порядок","Архитектурный стрит"],
+    ["pattern_break","Разрыв паттерна",
+      "pattern interrupted by a single different element",
+      "Show dozens of black umbrellas with one red umbrella breaking the pattern.",
+      "Сильный визуальный акцент","Классика"],
+    ["visual_rhyme","Эхо форм",
+      "visual rhyme, echoing shapes between subject and environment",
+      "Make the curve of a person's hunched back visually rhyme with the arch above them.",
+      "Поэзия и скрытая связь","Cartier-Bresson"],
+    ["same_pose","Клонирование поз",
+      "multiple strangers in identical poses",
+      "Show three strangers at a bus stop in the same pose, each staring at a phone.",
+      "Ирония и социальный комментарий","Современный стрит"],
+    ["crowd_texture","Толпа как текстура",
+      "dense crowd as texture, one face in focus",
+      "Let the crowd dissolve into texture, with one sharply focused face turned toward the camera.",
+      "Одиночество в толпе","Moriyama"]
+  ]
+},
+{
+  title:"6. Смысловые и нарративные приёмы",
+  items:[
+    ["moment","Решающий момент",
+      "decisive moment, peak of action, mid-leap",
+      "Catch the decisive moment of a leap over a puddle, with the heel just above its reflection.",
+      "Кульминация и застывшее время","Cartier-Bresson"],
+    ["juxtaposition","Джакстапозиция",
+      "ironic juxtaposition, billboard versus passerby",
+      "Create an ironic juxtaposition between a luxury perfume billboard and a tired street cleaner beneath it.",
+      "Сатира и столкновение смыслов","Winogrand, Parr"],
+    ["scale","Контраст масштабов",
+      "tiny figure against monumental architecture",
+      "Dwarf a tiny human figure against a monumental concrete facade.",
+      "Уязвимость человека в городе","Ho"],
+    ["gesture","Жест",
+      "expressive candid gesture, hands telling the story",
+      "Tell the story through an old man's hands gripping a worn transit ticket.",
+      "Микродрама и деталь-рассказ","Cartier-Bresson"],
+    ["anticipation","Незавершённое действие",
+      "frozen mid-action, anticipation, moment before",
+      "Capture the moment before an action completes: a glass tipping or a hand reaching, with tension unresolved.",
+      "Саспенс и воображение зрителя","Erwitt"],
+    ["eye_contact","Взгляд в камеру",
+      "direct eye contact with camera, confrontational",
+      "Capture a stranger's sudden direct eye contact with the lens, caught mid-stride.",
+      "Прямой контакт со зрителем","Gilden, Moriyama"],
+    ["connection","Скрытая связь персонажей",
+      "two unrelated strangers visually connected",
+      "Connect two strangers visually through the same gesture across the frame, while they remain unaware of each other.",
+      "Магия городской случайности","Webb"],
+    ["absence","Отсутствие человека",
+      "human presence without people, empty chair, lit window",
+      "Show only traces of human presence: a still-steaming cup and an abandoned newspaper on a bench, with no people visible.",
+      "Меланхолия и ощущение «после»","Атже"]
+  ]
+},
+{
+  title:"7. Цветовая композиция",
+  items:[
+    ["accent","Один цветовой акцент",
+      "muted palette with single red accent",
+      "Keep the scene almost monochrome and muted, with a single red umbrella as the only strong color accent.",
+      "Мгновенный фокус и поэзия","Saul Leiter"],
+    ["complementary","Комплементарный контраст",
+      "complementary color contrast, teal and orange or red and green",
+      "Contrast warm orange tungsten shop light with cold blue twilight.",
+      "Цветовое напряжение","Webb"],
+    ["color_blocks","Цветовые блоки",
+      "color blocking, large geometric color fields",
+      "Divide the frame into large color fields: a yellow wall, blue shadow, and a figure between them.",
+      "Графика и геометрия","Гуэрра, современный стрит"],
+    ["mono_palette","Монохромная гамма",
+      "tonal color palette, shades of one hue",
+      "Hold the scene in shades of grey-green, with fog swallowing the other colors.",
+      "Целостное настроение","Туманный стрит"],
+    ["color_layers","Цвет как слой",
+      "saturated colors organizing chaotic layers",
+      "Organize the chaotic layers through saturated colors, with each plane keyed to its own hue.",
+      "Цветовая многослойность","Alex Webb"],
+    ["neon","Неоновая палитра",
+      "magenta and cyan neon palette on wet surfaces",
+      "Let magenta and cyan neon bleed into wet asphalt, painting the night scene.",
+      "Синтетическая ночь","Wong Kar-wai — эстетический ориентир"]
+  ]
+},
+{
+  title:"8. Осознанное нарушение правил",
+  items:[
+    ["dutch","Заваленный горизонт",
+      "Dutch angle, tilted frame, off-kilter",
+      "Deliberately tilt the frame, making the horizon run diagonally to introduce unease.",
+      "Тревога и энергия","Winogrand"],
+    ["crop","Обрез по живому",
+      "subject cut off at frame edge, aggressive crop",
+      "Cut part of the passerby's face at the frame edge, creating an aggressive, accidental-looking crop.",
+      "Спонтанность и выхваченность","Moriyama"],
+    ["rough","Смаз и зерно",
+      "are-bure-boke style, grainy, blurry, out of focus",
+      "Make the image grainy, blurry and rough, with motion smearing the figures in an are-bure-boke aesthetic.",
+      "Сырая энергия и антиэстетика","Daido Moriyama"],
+    ["hip","Съёмка от бедра",
+      "hip-level shot, unplanned framing",
+      "Use an unnoticed hip-level viewpoint, with imperfect, spontaneous framing.",
+      "Документальная случайность","Maier, Winogrand"],
+    ["miss_focus","Расфокус героя",
+      "main subject slightly out of focus, background sharp",
+      "Keep the main figure slightly out of focus while the background remains sharp.",
+      "Эмоциональное несовершенство","Leiter"],
+    ["exposure","Пересвет / провал",
+      "blown highlights, crushed shadows, harsh exposure",
+      "Allow blown highlights and crushed shadows, sacrificing exposure precision for the moment.",
+      "Момент важнее техники","Фотожурналистика"],
+    ["flash","Вспышка в лоб",
+      "direct on-camera flash at night, harsh look",
+      "Use harsh direct flash to freeze a startled face against a dark night street.",
+      "Брутальность и прямота","Bruce Gilden"],
+    ["all_over","Хаос без центра",
+      "no single subject, democratic frame, all-over composition",
+      "Give the frame no single dominant subject, letting the viewer discover micro-scenes throughout the image.",
+      "Кадр-головоломка","Winogrand"]
+  ]
+},
+{
+  title:"Дополнение из ваших связок",
+  items:[
+    ["negative","Негативное пространство",
+      "generous negative space, solitary figure against an uncluttered background",
+      "Leave generous uncluttered negative space around the solitary figure, emphasizing their isolation.",
+      "Одиночество и масштаб","Fan Ho, минималистичный стрит"]
+  ]
+}
+];
+
+const ITEMS=GROUPS.flatMap(g=>g.items);
+const BY_ID=new Map(ITEMS.map(x=>[x[0],x]));
+const PRESETS=[
+  {
+    name:"Слои · полдень · цвет",
+    ids:["layers","color_layers"],
+    time:"hard midday sunlight",
+    hint:"Также устанавливает жёсткий полуденный свет."
+  },
+  {
+    name:"Стекло · акцент · телевик",
+    ids:["glass","accent","tele"],
+    hint:"Оптику и объекты не меняет — проверьте их отдельно."
+  },
+  {
+    name:"Луч · силуэт · масштаб",
+    ids:["shaft","silhouette","scale"]
+  },
+  {
+    name:"Момент · эхо · чистые края",
+    ids:["moment","visual_rhyme","clean_edges"]
+  },
+  {
+    name:"Смаз · обрез · вспышка",
+    ids:["rough","crop","flash"]
+  },
+  {
+    name:"Рама · взгляд · пустота",
+    ids:["frame_in_frame","gaze_out","negative"]
+  }
+];
+
+function normalizeComposition(raw){
+  const ids=Array.isArray(raw?.ids)
+    ?[...new Set(raw.ids.filter(id=>BY_ID.has(id)))]:[];
+  return {
+    enabled:typeof raw?.enabled==="boolean"?raw.enabled:true,
+    ids
+  };
+}
+function composition(){
+  if(!state.composition)state.composition=normalizeComposition();
+  return state.composition;
+}
+function selectedItems(){
+  const c=composition();
+  return c.enabled?c.ids.map(id=>BY_ID.get(id)).filter(Boolean):[];
+}
+
+/*
+  Оригинальный загрузчик v2 не знает о новом поле.
+  Расширяем валидацию и восстанавливаем поле из localStorage.
+*/
+const originalValidate=validateProject;
+validateProject=function(data){
+  const result=originalValidate(data);
+  result.composition=normalizeComposition(data?.state?.composition);
+  return result;
+};
+
+state.composition=normalizeComposition();
+try{
+  const saved=JSON.parse(localStorage.getItem(STORE)||"null");
+  if(saved){
+    const checked=validateProject(saved);
+    // Не подменяем текущую сцену, если базовый загрузчик её не восстановил.
+    if(JSON.stringify(checked.objects)===JSON.stringify(state.objects)){
+      state.composition=checked.composition;
+    }
+  }
+}catch{}
+
+const originalExample=example;
+example=function(){
+  const result=originalExample();
+  result.composition=normalizeComposition();
+  return result;
+};
+
+// ---------- Интерфейс каталога ----------
+const panel=document.createElement("section");
+panel.id="compositionPanel";
+panel.className="panel";
+panel.innerHTML=`
+  <div class="comp-switch">
+    <h2 style="margin:0">Композиционные приёмы</h2>
+    <input id="compEnabled" type="checkbox"
+      aria-label="Включить композиционные приёмы в промпт">
+  </div>
+  <p class="muted">
+    58 приёмов + негативное пространство.
+    Общий переключатель отключает их влияние, сохраняя выбор.
+  </p>
+  <div id="compSelected"></div>
+  <div id="compBody">
+    <label for="compSearch">Найти приём, эффект или фотографа</label>
+    <input id="compSearch" type="search"
+      placeholder="Стекло, силуэт, Leiter…">
+    <details id="compPresets">
+      <summary>Быстрые сочетания</summary>
+      <div id="compPresetButtons" class="buttons" style="margin-top:10px"></div>
+      <p class="muted">
+        Сочетание заменяет текущий набор.
+        Только «Слои · полдень · цвет» дополнительно меняет окружающий свет.
+      </p>
+    </details>
+    <div class="buttons" style="margin-top:10px">
+      <button id="compClear" type="button">Снять все</button>
+      <span id="compCount" class="muted"></span>
+    </div>
+    <div id="compResults"></div>
+  </div>
+  <p class="comp-note">
+    2–3 приёма — удобный ориентир, не жёсткий лимит.
+    В примерах есть конкретные предметы и действия:
+    проверяйте, соответствуют ли они вашему сюжету.
+  </p>
+`;
+
+const left=document.querySelector(".left");
+left.insertBefore(panel,left.children[1]||null);
+
+const catalog=$("compResults");
+GROUPS.forEach((group,index)=>{
+  const section=document.createElement("details");
+  section.className="comp-section";
+  section.open=index===0;
+  section.dataset.group=String(index);
+
+  const summary=document.createElement("summary");
+  summary.textContent=group.title;
+  section.append(summary);
+
+  for(const item of group.items){
+    const [id,name,mj,nb,effect,master]=item;
+    const row=document.createElement("div");
+    row.className="comp-item";
+    row.dataset.compItem=id;
+    row.dataset.search=item.join(" ").toLocaleLowerCase("ru");
+
+    const labelEl=document.createElement("label");
+    const checkbox=document.createElement("input");
+    checkbox.type="checkbox";
+    checkbox.dataset.compId=id;
+    const title=document.createElement("span");
+    title.textContent=name;
+    labelEl.append(checkbox,title);
+
+    const desc=document.createElement("div");
+    desc.className="comp-desc";
+    desc.textContent=effect+" · "+master;
+
+    const examples=document.createElement("details");
+    examples.className="comp-example";
+    const heading=document.createElement("summary");
+    heading.textContent="Формулировки MJ / NB";
+    const pMJ=document.createElement("p");
+    pMJ.textContent="MJ: "+mj;
+    const pNB=document.createElement("p");
+    pNB.textContent="NB: "+nb;
+    examples.append(heading,pMJ,pNB);
+    row.append(labelEl,desc,examples);
+    section.append(row);
+  }
+  catalog.append(section);
+});
+
+PRESETS.forEach(preset=>{
+  const b=document.createElement("button");
+  b.type="button";
+  b.textContent=preset.name;
+  b.title=preset.hint||"Заменить набор выбранных приёмов";
+  b.onclick=()=>{
+    change(()=>{
+      state.composition={enabled:true,ids:[...preset.ids]};
+      if(preset.time)state.config.time=preset.time;
+    });
+    say("Сочетание применено. "+(preset.hint||"Проверьте соответствие сцене."));
+  };
+  $("compPresetButtons").append(b);
+});
+
+$("compEnabled").onchange=()=>{
+  change(()=>composition().enabled=$("compEnabled").checked);
+};
+$("compClear").onclick=()=>{
+  change(()=>composition().ids=[]);
+};
+catalog.addEventListener("change",e=>{
+  const input=e.target.closest("[data-comp-id]");
+  if(!input)return;
+  const id=input.dataset.compId;
+  change(()=>{
+    const c=composition();
+    if(input.checked){
+      if(!c.ids.includes(id))c.ids.push(id);
+    }else c.ids=c.ids.filter(x=>x!==id);
+  });
+});
+
+$("compSearch").oninput=()=>{
+  const q=$("compSearch").value.trim().toLocaleLowerCase("ru");
+  for(const section of catalog.querySelectorAll(".comp-section")){
+    let found=0;
+    for(const row of section.querySelectorAll(".comp-item")){
+      const match=!q||row.dataset.search.includes(q);
+      row.hidden=!match;
+      if(match)found++;
+    }
+    section.hidden=found===0;
+    if(q&&found)section.open=true;
+  }
+};
+
+function renderComposition(){
+  const c=composition();
+  $("compEnabled").checked=c.enabled;
+  $("compBody").classList.toggle("comp-disabled",!c.enabled);
+  $("compCount").textContent=
+    `Выбрано: ${c.ids.length}${c.enabled?"":" · выключено"}`;
+
+  for(const input of catalog.querySelectorAll("[data-comp-id]")){
+    input.checked=c.ids.includes(input.dataset.compId);
+  }
+
+  const chips=$("compSelected");
+  chips.replaceChildren();
+  for(const id of c.ids){
+    const item=BY_ID.get(id);
+    if(!item)continue;
+    const b=document.createElement("button");
+    b.type="button";
+    b.className="comp-chip";
+    b.textContent=item[1]+" ×";
+    b.title="Убрать приём";
+    b.onclick=()=>change(()=>{
+      composition().ids=composition().ids.filter(x=>x!==id);
+    });
+    chips.append(b);
+  }
+}
+
+// ---------- Добавление в промпты ----------
+const originalPrompts=prompts;
+prompts=function(){
+  const base=originalPrompts();
+  const items=selectedItems();
+  if(!items.length)return base;
+
+  const scene=state.config.scene.trim()||"An everyday urban street scene.";
+
+  function insertAfterScene(text,addition){
+    const i=text.indexOf(scene);
+    if(i<0)return text+" "+addition;
+    const at=i+scene.length;
+    return text.slice(0,at)+" "+addition+" "+text.slice(at).trimStart();
+  }
+
+  base.mj=insertAfterScene(
+    base.mj,
+    "Composition: "+items.map(x=>x[2]).join("; ")+"."
+  );
+  base.nb=insertAfterScene(
+    base.nb,
+    items.map(x=>x[3]).join(" ")
+  );
+  return base;
+};
+
+// ---------- Мягкая проверка конфликтов ----------
+const originalUpdateOutput=updateOutput;
+updateOutput=function(){
+  originalUpdateOutput();
+
+  const items=selectedItems();
+  if(!items.length)return;
+  const ids=new Set(items.map(x=>x[0]));
+  const warnings=[];
+  const has=id=>ids.has(id);
+  const pair=(a,b,message)=>{
+    if(has(a)&&has(b))warnings.push(message);
+  };
+  const objects=state.objects.filter(active);
+  const hero=objects.find(o=>o.main);
+  const people=objects.filter(o=>o.type==="person");
+
+  if(items.length>3){
+    warnings.push(
+      "Выбрано больше трёх композиционных приёмов. Это разрешено, " +
+      "но конкурирующие инструкции могут ослабить основной замысел."
+    );
+  }
+
+  pair("thirds","symmetry",
+    "Правило третей и центральная симметрия предлагают разное положение главного героя.");
+  pair("low_horizon","high_horizon",
+    "Одновременно выбраны низкий и высокий горизонт.");
+  pair("low_key","high_key",
+    "Низкий и высокий ключ задают противоположное распределение тонов.");
+  pair("clean_edges","crop",
+    "Чистые края и агрессивный обрез могут противоречить друг другу.");
+  pair("gaze_out","eye_contact",
+    "Взгляд за пределы кадра и взгляд в камеру конфликтуют, если относятся к одному герою.");
+  pair("near_far","tele",
+    "Ближний-дальний и телекомпрессия предполагают разные пространственные решения.");
+  pair("silhouette","eye_contact",
+    "У силуэта без деталей лица прямой зрительный контакт может быть неразличим.");
+  pair("layers","middle_focus",
+    "В MJ трёхплановость из таблицы включает deep focus, а эшелон резкости размывает передний и задний планы.");
+  pair("mono_palette","neon",
+    "Гамма одного оттенка конкурирует с двухцветной неоновой палитрой.");
+
+  if(has("absence")&&people.length)
+    warnings.push("Приём «Отсутствие человека» выбран, но в сцене есть активные герои.");
+
+  if(has("all_over")&&hero)
+    warnings.push("Выбран кадр без центра, но один объект помечен главным.");
+
+  if(has("thirds")&&hero&&hero.x>.4)
+    warnings.push("Формулировка правила третей ставит героя слева, а на схеме он расположен иначе.");
+
+  if(has("symmetry")&&hero&&Math.abs(hero.x-.5)>.08)
+    warnings.push("Для центральной композиции главный объект на схеме заметно смещён от центра.");
+
+  if(has("triangle")&&people.length!==3)
+    warnings.push("Приём «Треугольники» описывает трёх персонажей; число героев на схеме другое.");
+
+  if(has("tele")&&Number(state.config.lens)<85)
+    warnings.push("Телекомпрессия выбрана вместе с широким или нормальным полем зрения. Проверьте дистанцию и оптику.");
+
+  if(has("near_far")&&Number(state.config.lens)>35)
+    warnings.push("Пример «Ближний-дальний» предполагает широкий угол; выбран более узкий.");
+
+  if(has("hip")&&state.config.height!=="hip-level viewpoint")
+    warnings.push("Приём «Съёмка от бедра» не совпадает с выбранной точкой камеры.");
+
+  if(has("miss_focus")&&state.config.focus==="subject")
+    warnings.push("Расфокус героя противоречит настройке «Герой резкий, фон мягкий».");
+
+  if(has("middle_focus")&&state.config.focus==="deep")
+    warnings.push("Эшелон резкости конфликтует с общей настройкой читаемости всех планов.");
+
+  if(has("flash")&&!state.config.time.includes("night"))
+    warnings.push("Табличный пример вспышки описывает ночь, а окружающий свет задан иначе.");
+
+  if(has("shaft")&&state.config.time.includes("night"))
+    warnings.push("Пример луча света описывает солнце между зданиями, но сцена настроена на ночь.");
+
+  const colorIds=["accent","pattern_break","complementary","color_blocks",
+    "mono_palette","color_layers","neon"];
+
+  if(["trix","hp5"].includes(state.config.film)&&colorIds.some(has))
+    warnings.push("Цветовые композиционные приёмы выбраны вместе с чёрно-белой эстетикой.");
+
+  for(const text of warnings){
+    const p=document.createElement("p");
+    p.textContent="• Композиция: "+text;
+    p.style.color="#e2c58e";
+    $("warnings").append(p);
+  }
+};
+
+// ---------- Световое пятно ----------
+const stage=document.querySelector(".center .stage");
+const lightToggle=document.createElement("label");
+lightToggle.className="check muted";
+lightToggle.innerHTML=`
+  <input id="showLightSpots" type="checkbox" checked>
+  Показывать условные световые пятна
+`;
+stage.after(lightToggle);
+$("showLightSpots").onchange=()=>draw();
+
+function lightSpotsMarkup(){
+  if(!$("showLightSpots")?.checked)return "";
+  const {w,h}=dims();
+  const objects=state.objects.filter(o=>!o.hidden);
+  let result="";
+
+  for(const source of objects.filter(o=>o.type==="light")){
+    const target=objects.find(o=>o.id===source.target)
+      ||objects.find(o=>o.main);
+
+    const x=(target?.x??source.x)*w;
+    const y=(target?.y??source.y)*h;
+    const sizeW=target?Math.max(target.w*w*1.4,90):w*.18;
+    const sizeH=target?Math.max(target.h*h*.8,75):h*.2;
+    const soft=source.lightQuality==="soft";
+    const color={
+      warm:"#ffd08b",
+      neutral:"#e9f0ff",
+      cool:"#87caff"
+    }[source.lightColor]||"#e9f0ff";
+
+    const shift={
+      left:[-sizeW*.3,0],
+      right:[sizeW*.3,0],
+      above:[0,-sizeH*.28],
+      behind:[0,0],
+      front:[0,0]
+    }[source.lightPosition]||[0,0];
+
+    const cx=x+shift[0],cy=y+shift[1];
+    const gradientId="frame-light-"+source.id;
+    const opacity=source.lightRole==="key"?.38:.22;
+
+    result+=`
+      <defs>
+        <radialGradient id="${gradientId}">
+          <stop offset="0" stop-color="${color}" stop-opacity="${opacity}"/>
+          <stop offset="${soft?"50%":"78%"}"
+            stop-color="${color}" stop-opacity="${opacity*.5}"/>
+          <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <ellipse cx="${cx}" cy="${cy}" rx="${sizeW}" ry="${sizeH}"
+        fill="url(#${gradientId})" pointer-events="none"/>`;
+
+    if(source.lightPosition==="behind"){
+      result+=`
+        <ellipse cx="${x}" cy="${y}" rx="${sizeW*.6}" ry="${sizeH*.8}"
+          fill="none" stroke="${color}" stroke-opacity=".35"
+          stroke-width="5" pointer-events="none"/>`;
+    }
+  }
+  return result;
+}
+
+const originalSvgContent=svgContent;
+svgContent=function(mode="editor"){
+  let content=originalSvgContent(mode);
+  if(mode==="clean")return content;
+
+  const glow=lightSpotsMarkup();
+  if(glow){
+    // Ставим пятна поверх фоновой заливки, но под объектами.
+    const marker='fill="#223044"/>';
+    const index=content.indexOf(marker);
+    if(index>=0){
+      const at=index+marker.length;
+      content=content.slice(0,at)+glow+content.slice(at);
+    }
+  }
+  return content;
+};
+
+// ---------- Ручки изменения размера ----------
+let resizeSession=null;
+const canvas=$("canvas");
+
+const originalDraw=draw;
+draw=function(){
+  originalDraw();
+  const o=current();
+  if(!o||o.hidden||o.locked)return;
+
+  const {w,h}=dims();
+  const ow=o.w*w,oh=o.h*h;
+  const group=document.createElementNS(NS,"g");
+  group.setAttribute(
+    "transform",
+    `translate(${o.x*w} ${o.y*h}) rotate(${o.rotation})`
+  );
+  group.setAttribute("aria-hidden","true");
+
+  const handles=[
+    ["nw",-ow/2,-oh/2,"nwse-resize"],
+    ["n",0,-oh/2,"ns-resize"],
+    ["ne",ow/2,-oh/2,"nesw-resize"],
+    ["e",ow/2,0,"ew-resize"],
+    ["se",ow/2,oh/2,"nwse-resize"],
+    ["s",0,oh/2,"ns-resize"],
+    ["sw",-ow/2,oh/2,"nesw-resize"],
+    ["west",-ow/2,0,"ew-resize"]
+  ];
+
+  for(const [name,x,y,cursor] of handles){
+    const rect=document.createElementNS(NS,"rect");
+    rect.dataset.resize=name;
+    rect.setAttribute("x",x-7);
+    rect.setAttribute("y",y-7);
+    rect.setAttribute("width","14");
+    rect.setAttribute("height","14");
+    rect.setAttribute("rx","3");
+    rect.setAttribute("fill","#b7ed78");
+    rect.setAttribute("stroke","#101721");
+    rect.setAttribute("stroke-width","2");
+    rect.style.cursor=cursor;
+    group.append(rect);
+  }
+  canvas.append(group);
+};
+
+canvas.addEventListener("pointerdown",e=>{
+  const handle=e.target.closest("[data-resize]");
+  if(!handle||e.button!==0)return;
+  const o=current();
+  if(!o||o.locked)return;
+  const p=point(e);
+  if(!p)return;
+
+  e.preventDefault();
+  e.stopImmediatePropagation();
+
+  const {w,h}=dims();
+  const angle=o.rotation*Math.PI/180;
+  resizeSession={
+    pointer:e.pointerId,
+    id:o.id,
+    handle:handle.dataset.resize,
+    before:serialize(),
+    centerX:o.x*w,
+    centerY:o.y*h,
+    cos:Math.cos(angle),
+    sin:Math.sin(angle),
+    originalW:o.w,
+    originalH:o.h
+  };
+  canvas.setPointerCapture(e.pointerId);
+  canvas.focus({preventScroll:true});
+},true);
+
+canvas.addEventListener("pointermove",e=>{
+  if(!resizeSession||resizeSession.pointer!==e.pointerId)return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+
+  const s=resizeSession;
+  const o=state.objects.find(x=>x.id===s.id);
+  const p=point(e);
+  if(!o||!p)return;
+
+  const {w,h}=dims();
+  const dx=p.x-s.centerX,dy=p.y-s.centerY;
+
+  // Координаты указателя в локальной системе повёрнутого объекта.
+  const localX=dx*s.cos+dy*s.sin;
+  const localY=-dx*s.sin+dy*s.cos;
+
+  const horizontal=!["n","s"].includes(s.handle);
+  const vertical=!["e","west"].includes(s.handle);
+
+  let nextW=horizontal?Math.abs(localX)*2/w:s.originalW;
+  let nextH=vertical?Math.abs(localY)*2/h:s.originalH;
+
+  if(e.shiftKey){
+    let factor;
+    if(horizontal&&vertical){
+      factor=Math.max(nextW/s.originalW,nextH/s.originalH);
+    }else factor=horizontal?nextW/s.originalW:nextH/s.originalH;
+
+    const minFactor=Math.max(.02/s.originalW,.02/s.originalH);
+    const maxFactor=Math.min(1.5/s.originalW,1.5/s.originalH);
+    factor=clamp(factor,minFactor,maxFactor);
+
+    nextW=s.originalW*factor;
+    nextH=s.originalH*factor;
+  }
+
+  o.w=clamp(nextW,.02,1.5);
+  o.h=clamp(nextH,.02,1.5);
+
+  draw();
+  syncEditor();
+  updateOutput();
+},true);
+
+function finishResize(e){
+  if(!resizeSession)return;
+  if(e.pointerId!==undefined&&e.pointerId!==resizeSession.pointer)return;
+  e.stopImmediatePropagation();
+  const before=resizeSession.before;
+  resizeSession=null;
+  remember(before);
+  render();
+}
+for(const event of ["pointerup","pointercancel","lostpointercapture"]){
+  canvas.addEventListener(event,finishResize,true);
+}
+
+// Не допускаем удаления объекта горячей клавишей во время resize.
+document.addEventListener("keydown",e=>{
+  if(!resizeSession)return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+},true);
+
+// ---------- Обновление общего интерфейса ----------
+const originalRender=render;
+render=function(){
+  composition();
+  originalRender();
+  renderComposition();
+};
+
+const resizeHelp=document.createElement("p");
+resizeHelp.className="muted";
+resizeHelp.textContent=
+  "Размер: потяните зелёные ручки выбранного объекта. " +
+  "Изменение идёт относительно его центра. " +
+  "Shift сохраняет пропорции. Точные значения доступны справа.";
+lightToggle.after(resizeHelp);
+
+render();
+say("Добавлены композиционные приёмы, изменение размера и световые пятна.");
+})();
+</script>
 </body>
 </html>
