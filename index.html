@@ -1,852 +1,937 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Схема кадра — конструктор промптов</title>
+<!-- Дополнение к frame-scheme-v2: композиция, размер, свет -->
 <style>
-:root{
-  color-scheme:dark;
-  --bg:#101218;--panel:#191d27;--line:#303747;
-  --text:#edf0f7;--muted:#a6afc1;--accent:#b6f36d;
+.comp-switch{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
 }
-*{box-sizing:border-box}
-body{
-  margin:0;background:var(--bg);color:var(--text);
-  font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;
+.comp-switch input{width:20px;height:20px;accent-color:var(--accent)}
+.comp-section{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+.comp-section summary{cursor:pointer;font-weight:600}
+.comp-item{
+  padding:10px 0;border-bottom:1px solid #ffffff0c;
 }
-header{
-  padding:20px 25px;border-bottom:1px solid var(--line);
-  display:flex;gap:20px;align-items:center;justify-content:space-between;
+.comp-item label{
+  display:flex;align-items:flex-start;gap:9px;
+  color:var(--text);font-size:13px;margin:0;cursor:pointer;
 }
-h1{font-size:23px;margin:0}
-h2{font-size:16px;margin:0 0 14px}
-p{margin:6px 0}
-.small{font-size:12px;color:var(--muted)}
-.badge{color:var(--accent);font-size:12px}
-.layout{
-  display:grid;grid-template-columns:270px minmax(350px,1fr) 310px;
-  gap:16px;padding:18px;max-width:1700px;margin:auto;
+.comp-item input{
+  width:17px;height:17px;flex-shrink:0;margin-top:3px;
+  accent-color:var(--accent);
 }
-.panel{
-  background:var(--panel);border:1px solid var(--line);
-  border-radius:14px;padding:17px;margin-bottom:15px;
+.comp-desc{margin:4px 0 0 26px;font-size:11px;color:var(--muted)}
+.comp-example{margin:6px 0 0 26px;font-size:11px}
+.comp-example summary{font-weight:400;color:var(--muted)}
+.comp-example p{overflow-wrap:anywhere}
+.comp-chip{
+  border-radius:20px;font-size:11px;padding:5px 9px;
 }
-label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px}
-input,select,textarea,button{
-  font:inherit;border-radius:8px;border:1px solid var(--line);
-}
-input,select,textarea{
-  width:100%;padding:9px;background:#11151e;color:var(--text);
-}
-textarea{resize:vertical}
-button{
-  padding:9px 12px;background:#252c3a;color:var(--text);cursor:pointer;
-}
-button:hover{border-color:var(--accent)}
-button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
-  outline:2px solid var(--accent);outline-offset:2px;
-}
-button.primary{background:var(--accent);color:#17220c;font-weight:700}
-button.danger{color:#ffaaa9}
-.buttons{display:flex;gap:7px;flex-wrap:wrap}
-.tools{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-.tools button{text-align:left}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.stage{
-  background:#0b0e14;border:1px solid var(--line);border-radius:12px;
-  padding:12px;overflow:hidden;
-}
-#canvas{
-  display:block;width:100%;height:auto;max-height:68vh;
-  touch-action:none;user-select:none;background:#131a26;
-}
-.canvasbar{display:flex;justify-content:space-between;gap:10px;margin-bottom:12px}
-.check{display:flex;align-items:center;gap:7px;margin:0}
-.check input{width:auto}
-.output{min-height:210px;font:13px/1.65 ui-monospace,monospace}
-.tabs{display:flex;gap:8px;margin-bottom:12px}
-.tabs button.active{border-color:var(--accent);color:var(--accent)}
-#layers{display:flex;flex-direction:column;gap:6px}
-.layer{display:flex;align-items:center;gap:6px}
-.layer button:first-child{
-  flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-}
-.layer.active button:first-child{border-color:var(--accent)}
-.layer span{font-size:11px;color:var(--muted)}
-.hidden{display:none!important}
-.note{padding:10px 12px;background:#222c21;border-radius:9px;color:#d0e8ba}
-#status{min-height:20px;color:var(--accent);font-size:12px;margin-top:8px}
-hr{border:0;border-top:1px solid var(--line);margin:16px 0}
-@media(max-width:1150px){
-  .layout{grid-template-columns:240px minmax(320px,1fr)}
-  .right{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:15px}
-}
-@media(max-width:720px){
-  header{padding:15px;align-items:flex-start;flex-direction:column}
-  .layout{display:flex;flex-direction:column;padding:10px}
-  .center{order:0}.left{order:1}.right{order:2;display:block}
-  #canvas{max-height:none}
-}
+.comp-disabled{opacity:.55}
+.comp-note{margin-top:9px;font-size:12px;color:#e2c58e}
+#compSelected{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+#compResults{max-height:580px;overflow:auto;padding-right:4px}
+#compPresets{margin-top:10px}
+#compPresets button{font-size:11px}
+.comp-extra{padding:9px 0;color:var(--muted);font-size:12px}
 </style>
-</head>
-<body>
-<header>
-  <div>
-    <div class="badge">STREET PHOTO · LOCAL PROTOTYPE</div>
-    <h1>Схема кадра</h1>
-    <p class="small">Расставьте элементы. Опишите момент. Соберите промпт.</p>
-  </div>
-  <div class="buttons">
-    <button id="preset">Пример: за стеклом</button>
-    <button id="save">Сохранить</button>
-    <button id="exportSvg">Скачать SVG</button>
-    <button id="clear">Очистить схему</button>
-  </div>
-</header>
-
-<div class="layout">
-  <aside class="left">
-    <section class="panel">
-      <h2>1. История</h2>
-      <label for="scene">Сюжет / место — EN</label>
-      <textarea id="scene" rows="4"></textarea>
-      <p class="small">Например: A quiet street outside a café at dusk.</p>
-
-      <label for="ratio">Формат кадра</label>
-      <select id="ratio">
-        <option value="3:2">3:2 — горизонтальный</option>
-        <option value="4:5">4:5 — вертикальный</option>
-        <option value="1:1">1:1 — квадрат</option>
-        <option value="16:9">16:9 — широкий</option>
-        <option value="65:24">65:24 — панорама</option>
-      </select>
-
-      <label for="mood">Настроение</label>
-      <select id="mood">
-        <option value="quiet urban solitude">Городское одиночество</option>
-        <option value="warm everyday nostalgia">Тёплая ностальгия</option>
-        <option value="restless urban energy">Энергия улицы</option>
-        <option value="tense nocturnal mystery">Ночной нуар</option>
-        <option value="calm observational documentary">Спокойный документ</option>
-      </select>
-    </section>
-
-    <section class="panel">
-      <h2>2. Добавить в кадр</h2>
-      <div class="tools" id="tools">
-        <button data-add="person">＋ Герой</button>
-        <button data-add="building">＋ Фон / здание</button>
-        <button data-add="frame">＋ Рама / окно</button>
-        <button data-add="occluder">＋ Препятствие</button>
-        <button data-add="light">＋ Свет</button>
-      </div>
-      <p class="small" style="margin-top:10px">
-        Перетаскивайте объекты на холсте. Глубина задаётся отдельно —
-        высота объекта на схеме не определяет его план.
-      </p>
-    </section>
-
-    <section class="panel">
-      <h2>3. Фотографическое решение</h2>
-
-      <label for="lens">Оптика — эквивалент 35 мм</label>
-      <select id="lens">
-        <option value="28">28 мм — широкий угол</option>
-        <option value="35">35 мм — контекст и герой</option>
-        <option value="50">50 мм — спокойное кадрирование</option>
-        <option value="85">85 мм — выделение героя</option>
-        <option value="135">135 мм — удалённое наблюдение</option>
-      </select>
-
-      <label for="height">Высота камеры</label>
-      <select id="height">
-        <option value="eye-level viewpoint">Уровень глаз</option>
-        <option value="hip-level viewpoint">От бедра</option>
-        <option value="low viewpoint near the pavement">У земли</option>
-        <option value="elevated viewpoint from a second-floor window">Из окна второго этажа</option>
-        <option value="high viewpoint from a bridge">С моста</option>
-      </select>
-
-      <label for="distance">Дистанция до главного героя</label>
-      <select id="distance">
-        <option value="about one meter">Около 1 м</option>
-        <option value="about three meters">Около 3 м</option>
-        <option value="about five meters">Около 5 м</option>
-        <option value="across the street">Через улицу</option>
-        <option value="across a large square">Через площадь</option>
-      </select>
-
-      <label for="focus">Резкость</label>
-      <select id="focus">
-        <option value="deep">Все основные планы читаемы</option>
-        <option value="subject">Герой резкий, фон мягкий</option>
-        <option value="middle">Резкость в среднем плане</option>
-      </select>
-
-      <label for="time">Время / окружающий свет</label>
-      <select id="time">
-        <option value="blue hour with cool ambient skylight">Синий час</option>
-        <option value="golden hour with low warm sunlight">Золотой час</option>
-        <option value="overcast daytime with soft diffuse skylight">Пасмурный день</option>
-        <option value="midday with hard overhead sunlight">Жёсткий полдень</option>
-        <option value="deep night with dark surroundings">Глухая ночь</option>
-      </select>
-
-      <label for="weather">Атмосфера</label>
-      <select id="weather">
-        <option value="light drizzle and wet pavement reflections">Морось, мокрый асфальт</option>
-        <option value="clear dry air">Сухой воздух</option>
-        <option value="dense fog separating the visible planes">Туман</option>
-        <option value="falling snow and muted distant detail">Снегопад</option>
-        <option value="backlit steam rising from a street vent">Пар из люка</option>
-      </select>
-
-      <label for="film">Эстетика изображения</label>
-      <select id="film">
-        <option value="portra">Portra 400 — тёплый приглушённый цвет</option>
-        <option value="cinestill">CineStill 800T — ночной цвет, ореолы</option>
-        <option value="trix">Tri-X — контрастный ч/б</option>
-        <option value="hp5">HP5 — мягкий ч/б</option>
-        <option value="gold">Gold 200 — тёплый бытовой цвет</option>
-        <option value="digital">Цифра — сдержанная обработка</option>
-      </select>
-
-      <label for="imperfection">Дополнительное несовершенство</label>
-      <select id="imperfection">
-        <option value="">Без дополнительного эффекта</option>
-        <option value="a slightly tilted handheld frame">Лёгкий наклон кадра</option>
-        <option value="slight motion blur on moving pedestrians">Лёгкий смаз прохожих</option>
-        <option value="small raindrops on the lens softly distorting highlights">Капли на линзе</option>
-      </select>
-    </section>
-  </aside>
-
-  <main class="center">
-    <section class="panel">
-      <div class="canvasbar">
-        <h2>Расстановка кадра</h2>
-        <label class="check"><input id="grid" type="checkbox" checked> Сетка третей</label>
-      </div>
-      <div class="stage">
-        <svg id="canvas" xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 1000 666.67" role="img"
-          aria-label="Интерактивная схема композиции"></svg>
-      </div>
-      <p class="small" style="margin-top:10px">
-        Это схема композиции, не предпросмотр генерации.
-        Стрелка у героя обозначает движение, у лампы — направление света в плоскости кадра.
-      </p>
-    </section>
-
-    <section class="panel">
-      <h2>Промпт</h2>
-      <div class="tabs">
-        <button id="tabMJ" class="active">Midjourney</button>
-        <button id="tabNB">Nano Banana</button>
-      </div>
-      <textarea id="output" class="output" readonly aria-label="Собранный промпт"></textarea>
-      <div class="buttons" style="margin-top:10px">
-        <button id="copy" class="primary">Копировать промпт</button>
-        <button id="downloadPrompt">Скачать TXT</button>
-      </div>
-      <div id="status" role="status" aria-live="polite"></div>
-      <p class="small">
-        Точная геометрия не гарантируется текстовым промптом.
-        Параметр --ar добавляется только в версию Midjourney.
-        Для Nano Banana пропорции описаны текстом: при необходимости выставьте их также в интерфейсе генератора.
-      </p>
-    </section>
-    <section class="panel">
-      <h2>Проверка замысла</h2>
-      <div id="warnings" class="small"></div>
-    </section>
-  </main>
-
-  <aside class="right">
-    <section class="panel">
-      <h2>Выбранный объект</h2>
-      <div id="emptyEditor" class="small">Нажмите на объект или добавьте новый.</div>
-      <div id="editor" class="hidden">
-        <label for="objText">Описание для промпта — EN</label>
-        <textarea id="objText" rows="3"></textarea>
-        <label for="objDepth">План</label>
-        <select id="objDepth">
-          <option value="foreground">Передний</option>
-          <option value="midground">Средний</option>
-          <option value="background">Задний</option>
-        </select>
-        <label for="objSize">Размер на схеме</label>
-        <input id="objSize" type="range" min="25" max="170" value="80">
-
-        <div class="row">
-          <div>
-            <label for="objX">X, % слева</label>
-            <input id="objX" type="number" min="0" max="100" step="1">
-          </div>
-          <div>
-            <label for="objY">Y, % сверху</label>
-            <input id="objY" type="number" min="0" max="100" step="1">
-          </div>
-        </div>
-
-        <div id="directionGroup">
-          <label for="objDirection" id="directionLabel">Направление</label>
-          <select id="objDirection">
-            <option value="none">Без направления / стоит</option>
-            <option value="left">Влево</option>
-            <option value="right">Вправо</option>
-            <option value="up">Вверх</option>
-            <option value="down">Вниз</option>
-          </select>
-        </div>
-
-        <div class="buttons" style="margin-top:15px">
-          <button id="duplicate">Дублировать</button>
-          <button id="delete" class="danger">Удалить</button>
-        </div>
-      </div>
-    </section>
-
-    <section class="panel">
-      <h2>Объекты кадра</h2>
-      <div id="layers"></div>
-      <hr>
-      <p class="small">
-        Порядок перекрытия: задний → средний → передний план.
-        При одинаковом плане более поздний объект рисуется поверх.
-        Источники света показаны условными значками.
-      </p>
-      <div class="note" style="margin-top:14px">
-        Подсказка: начните с героя и одного композиционного приёма.
-        Затем добавьте свет и атмосферу.
-      </div>
-    </section>
-  </aside>
-</div>
 
 <script>
+(()=>{
 "use strict";
 
-const $ = id => document.getElementById(id);
-const SVG_NS = "http://www.w3.org/2000/svg";
-const KEY = "street-frame-scheme-v1";
+/*
+  Это дополнение использует функции и состояние версии 2.
+  Не вставляйте его внутрь существующего <script>.
+*/
+if(document.getElementById("compositionPanel"))return;
 
-const esc = s => String(s).replace(/[&<>"']/g, c =>
-  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const clamp = (n,a,b) => Math.max(a,Math.min(b,n));
-const uid = () => "o" + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
-
-const kinds = {
-  person: {name:"Герой", text:"a lone pedestrian in a dark coat", size:65, depth:"midground"},
-  building:{name:"Здание",text:"a quiet apartment building",size:105,depth:"background"},
-  frame:{name:"Рама",text:"a dark café window frame",size:120,depth:"foreground"},
-  occluder:{name:"Препятствие",text:"a blurred foreground silhouette",size:90,depth:"foreground"},
-  light:{name:"Свет",text:"a warm shop-window light",size:50,depth:"background"}
-};
-const depths = {background:0,midground:1,foreground:2};
-const depthNames = {background:"Задний",midground:"Средний",foreground:"Передний"};
-
-const films = {
-  portra:"a Kodak Portra 400-inspired palette, warm muted colors and fine grain",
-  cinestill:"a CineStill 800T-inspired look, cool shadows and restrained red halation around bright highlights",
-  trix:"a Kodak Tri-X-inspired black-and-white image with pronounced grain, deep blacks and strong contrast",
-  hp5:"an Ilford HP5-inspired black-and-white image with gentle contrast and a broad tonal range",
-  gold:"a Kodak Gold 200-inspired palette with warm everyday snapshot colors and visible fine grain",
-  digital:"natural digital rendering with restrained sharpening and believable tonal transitions"
-};
-
-const focusText = {
-  deep:"Keep the main foreground, middle and background subjects legible with broad depth of field",
-  subject:"Keep the main subject sharp and let the background fall softly out of focus",
-  middle:"Focus on the middle plane, with foreground and background softly blurred"
-};
-
-const configKeys = [
-  "scene","ratio","mood","lens","height","distance",
-  "focus","time","weather","film","imperfection"
+// [id, название, Midjourney, Nano Banana, эффект, референс]
+const GROUPS=[
+{
+  title:"1. Геометрия и структура кадра",
+  items:[
+    ["thirds","Правило третей",
+      "rule of thirds, subject on left third",
+      "The subject is positioned on the left third of the frame, leaving open space ahead of them.",
+      "Асимметрия и воздух по направлению взгляда","Универсально"],
+    ["symmetry","Центральная симметрия",
+      "centered symmetrical composition, formal framing",
+      "Use a perfectly centered, symmetrical composition, with the figure in the exact middle of the frame.",
+      "Монументальность, торжественность","Fan Ho"],
+    ["golden","Золотое сечение",
+      "golden ratio composition, spiral flow",
+      "Use a golden-ratio balance, guiding the eye in a spiral from the corner toward the subject.",
+      "Плавное движение взгляда","Классика"],
+    ["diagonal","Диагональная композиция",
+      "strong diagonal composition, dynamic tension",
+      "Build the scene on a strong diagonal running from lower left to upper right.",
+      "Движение, энергия, напряжение","Родченко"],
+    ["triangle","Треугольники",
+      "triangular composition, three figures forming a triangle",
+      "Arrange three figures in a loose triangle, creating structural stability within the street's chaos.",
+      "Устойчивость в хаосе улицы","Cartier-Bresson"],
+    ["low_horizon","Горизонт низко",
+      "horizon on lower third, dominant sky",
+      "Keep the horizon on the lower third, with a vast dramatic sky dominating the frame.",
+      "Небо как герой, масштаб","Пейзажный стрит"],
+    ["high_horizon","Горизонт высоко",
+      "high horizon line, emphasis on street surface",
+      "Use a high horizon so that wet asphalt and shadows fill most of the frame.",
+      "Фактура земли и отражения","Leiter"],
+    ["clean_edges","Чистые края кадра",
+      "clean frame edges, disciplined edge composition",
+      "Compose the frame edges carefully, avoiding accidental cuts and distracting clutter touching the borders.",
+      "Собранность и дисциплина","Winogrand"]
+  ]
+},
+{
+  title:"2. Линии и управление взглядом",
+  items:[
+    ["leading","Ведущие линии",
+      "leading lines toward the subject, converging perspective",
+      "Let tram rails and building edges converge as leading lines toward the lone figure.",
+      "Направление взгляда к герою","Cartier-Bresson"],
+    ["s_curve","S-кривая",
+      "S-curve street winding through frame",
+      "Let a wet cobblestone street curve in a soft S-shape into the fog.",
+      "Плавность и лиричность","Пейзажный стрит"],
+    ["verticals","Сходящиеся вертикали",
+      "converging verticals, towering buildings",
+      "Look upward so the buildings' verticals converge above the small figure below.",
+      "Давление города на человека","Fan Ho"],
+    ["gaze_out","Направление взгляда героя",
+      "subject gazing out of frame, implied line",
+      "Direct the subject's gaze out of the frame, creating an invisible line for the viewer to follow.",
+      "Недосказанность, история за кадром","Maier"],
+    ["pointing","Указующий жест",
+      "pointing gesture creating visual vector",
+      "Let a stranger's pointing arm form a visual vector across the composition.",
+      "Взгляд следует за жестом","Winogrand"],
+    ["shadow_line","Тень как линия",
+      "long shadow as a leading line",
+      "Use the figure's elongated shadow stretching across the image as the main compositional line.",
+      "Графика и двойник героя","Fan Ho"],
+    ["counterflow","Контрдвижение",
+      "two opposing directions of movement in frame",
+      "Show pedestrians moving in opposite directions, with their paths crossing at the center.",
+      "Напряжение и пульс улицы","Webb"]
+  ]
+},
+{
+  title:"3. Глубина и слои",
+  items:[
+    ["layers","Трёхплановость",
+      "layered composition, foreground, midground, background action, deep focus",
+      "Build three distinct planes: an out-of-focus shoulder in the foreground, the main subject in the middle, and street life unfolding behind.",
+      "Многослойный кадр, организованный хаос","Alex Webb"],
+    ["frame_in_frame","Кадр в кадре",
+      "framed within a doorway, window or arch",
+      "Frame the scene within a dark doorway, with the bright street visible beyond like a stage.",
+      "Театральность и фокус","Webb, Ho"],
+    ["obstruction","Передний план-препятствие",
+      "obstructed foreground, shooting past objects",
+      "Look past a blurred lamppost and passersby, glimpsing the subject between obstacles.",
+      "Подглядывание и присутствие","Leiter"],
+    ["glass","Съёмка сквозь стекло",
+      "through rain-streaked glass, layered reflections",
+      "View the scene through a fogged café window, with neon reflections merging with the figures inside.",
+      "Живописная многослойность","Saul Leiter"],
+    ["near_far","Ближний-дальний",
+      "near-far composition, huge foreground detail, wide angle",
+      "Use a wide-angle near-far composition, with a large coffee cup in the foreground and tiny figures crossing far behind.",
+      "Втягивание зрителя в кадр","28mm-школа"],
+    ["tele","Телекомпрессия",
+      "compressed telephoto perspective, stacked flat layers",
+      "Observe from a distance with a long lens, making the crowd appear as overlapping flat layers.",
+      "Плоскостность и абстракция","Leiter"],
+    ["haze_depth","Атмосферная глубина",
+      "atmospheric depth, haze separating planes",
+      "Let each successive plane fade lighter into the haze, creating natural depth separation.",
+      "Воздух и тональная перспектива","Туманный стрит"],
+    ["middle_focus","Эшелон резкости",
+      "selective focus on middle plane, blurred front and back",
+      "Keep only the middle plane in sharp focus, with foreground and background dissolving into blur.",
+      "Кинематографичный взгляд сквозь слои","Кино-стрит"]
+  ]
+},
+{
+  title:"4. Свето-тональная композиция",
+  items:[
+    ["chiaroscuro","Кьяроскуро",
+      "chiaroscuro, dramatic light-dark contrast",
+      "Use deep chiaroscuro, with the figure emerging from near-total darkness into a blade of light.",
+      "Светотеневая драма","Fan Ho"],
+    ["shaft","Луч света / прожектор",
+      "single shaft of light isolating the subject",
+      "Let a single shaft of sunlight fall between buildings, spotlighting one pedestrian while the surroundings remain in shadow.",
+      "Театральный акцент","Fan Ho"],
+    ["silhouette","Силуэт",
+      "backlit silhouette, no facial detail",
+      "Reduce the figure to a black silhouette against glowing fog, without readable facial detail.",
+      "Анонимность и архетип","Ho, Brandt"],
+    ["figure_ground","Фигура-фон",
+      "strong figure-to-ground separation, subject against clean tonal background",
+      "Separate the dark figure clearly against a bright empty wall, creating strong figure-to-ground contrast.",
+      "Мгновенная читаемость","Универсально"],
+    ["low_key","Низкий ключ",
+      "low-key, dominant shadows, small bright accents",
+      "Keep most of the image in shadow, with only faces and neon catching light.",
+      "Нуар и тайна","Moriyama"],
+    ["high_key","Высокий ключ",
+      "high-key, pale overexposed tones, minimal shadows",
+      "Wash the scene in pale overcast light, with high-key tones and almost no shadows.",
+      "Лёгкость и зимняя тишина","Скандинавский стрит"],
+    ["giant_shadow","Тень больше героя",
+      "giant cast shadow dominating, small figure",
+      "Let an enormous cast shadow occupy half the frame, with its owner appearing as a small figure in the corner.",
+      "Сюрреализм и второй сюжет","Ho, Кертес"],
+    ["window_light","Свет из окна",
+      "single window light, rembrandt-like street portrait",
+      "Use soft directional light from a shop window to sculpt one side of the face while the other falls into shadow.",
+      "Интимный уличный портрет","Maier"]
+  ]
+},
+{
+  title:"5. Ритм, паттерн, повторение",
+  items:[
+    ["rhythm","Ритм",
+      "rhythmic repetition of arches, columns or umbrellas",
+      "Show a rhythmic row of identical arches receding into the distance, with a figure breaking the cadence.",
+      "Музыкальность и порядок","Архитектурный стрит"],
+    ["pattern_break","Разрыв паттерна",
+      "pattern interrupted by a single different element",
+      "Show dozens of black umbrellas with one red umbrella breaking the pattern.",
+      "Сильный визуальный акцент","Классика"],
+    ["visual_rhyme","Эхо форм",
+      "visual rhyme, echoing shapes between subject and environment",
+      "Make the curve of a person's hunched back visually rhyme with the arch above them.",
+      "Поэзия и скрытая связь","Cartier-Bresson"],
+    ["same_pose","Клонирование поз",
+      "multiple strangers in identical poses",
+      "Show three strangers at a bus stop in the same pose, each staring at a phone.",
+      "Ирония и социальный комментарий","Современный стрит"],
+    ["crowd_texture","Толпа как текстура",
+      "dense crowd as texture, one face in focus",
+      "Let the crowd dissolve into texture, with one sharply focused face turned toward the camera.",
+      "Одиночество в толпе","Moriyama"]
+  ]
+},
+{
+  title:"6. Смысловые и нарративные приёмы",
+  items:[
+    ["moment","Решающий момент",
+      "decisive moment, peak of action, mid-leap",
+      "Catch the decisive moment of a leap over a puddle, with the heel just above its reflection.",
+      "Кульминация и застывшее время","Cartier-Bresson"],
+    ["juxtaposition","Джакстапозиция",
+      "ironic juxtaposition, billboard versus passerby",
+      "Create an ironic juxtaposition between a luxury perfume billboard and a tired street cleaner beneath it.",
+      "Сатира и столкновение смыслов","Winogrand, Parr"],
+    ["scale","Контраст масштабов",
+      "tiny figure against monumental architecture",
+      "Dwarf a tiny human figure against a monumental concrete facade.",
+      "Уязвимость человека в городе","Ho"],
+    ["gesture","Жест",
+      "expressive candid gesture, hands telling the story",
+      "Tell the story through an old man's hands gripping a worn transit ticket.",
+      "Микродрама и деталь-рассказ","Cartier-Bresson"],
+    ["anticipation","Незавершённое действие",
+      "frozen mid-action, anticipation, moment before",
+      "Capture the moment before an action completes: a glass tipping or a hand reaching, with tension unresolved.",
+      "Саспенс и воображение зрителя","Erwitt"],
+    ["eye_contact","Взгляд в камеру",
+      "direct eye contact with camera, confrontational",
+      "Capture a stranger's sudden direct eye contact with the lens, caught mid-stride.",
+      "Прямой контакт со зрителем","Gilden, Moriyama"],
+    ["connection","Скрытая связь персонажей",
+      "two unrelated strangers visually connected",
+      "Connect two strangers visually through the same gesture across the frame, while they remain unaware of each other.",
+      "Магия городской случайности","Webb"],
+    ["absence","Отсутствие человека",
+      "human presence without people, empty chair, lit window",
+      "Show only traces of human presence: a still-steaming cup and an abandoned newspaper on a bench, with no people visible.",
+      "Меланхолия и ощущение «после»","Атже"]
+  ]
+},
+{
+  title:"7. Цветовая композиция",
+  items:[
+    ["accent","Один цветовой акцент",
+      "muted palette with single red accent",
+      "Keep the scene almost monochrome and muted, with a single red umbrella as the only strong color accent.",
+      "Мгновенный фокус и поэзия","Saul Leiter"],
+    ["complementary","Комплементарный контраст",
+      "complementary color contrast, teal and orange or red and green",
+      "Contrast warm orange tungsten shop light with cold blue twilight.",
+      "Цветовое напряжение","Webb"],
+    ["color_blocks","Цветовые блоки",
+      "color blocking, large geometric color fields",
+      "Divide the frame into large color fields: a yellow wall, blue shadow, and a figure between them.",
+      "Графика и геометрия","Гуэрра, современный стрит"],
+    ["mono_palette","Монохромная гамма",
+      "tonal color palette, shades of one hue",
+      "Hold the scene in shades of grey-green, with fog swallowing the other colors.",
+      "Целостное настроение","Туманный стрит"],
+    ["color_layers","Цвет как слой",
+      "saturated colors organizing chaotic layers",
+      "Organize the chaotic layers through saturated colors, with each plane keyed to its own hue.",
+      "Цветовая многослойность","Alex Webb"],
+    ["neon","Неоновая палитра",
+      "magenta and cyan neon palette on wet surfaces",
+      "Let magenta and cyan neon bleed into wet asphalt, painting the night scene.",
+      "Синтетическая ночь","Wong Kar-wai — эстетический ориентир"]
+  ]
+},
+{
+  title:"8. Осознанное нарушение правил",
+  items:[
+    ["dutch","Заваленный горизонт",
+      "Dutch angle, tilted frame, off-kilter",
+      "Deliberately tilt the frame, making the horizon run diagonally to introduce unease.",
+      "Тревога и энергия","Winogrand"],
+    ["crop","Обрез по живому",
+      "subject cut off at frame edge, aggressive crop",
+      "Cut part of the passerby's face at the frame edge, creating an aggressive, accidental-looking crop.",
+      "Спонтанность и выхваченность","Moriyama"],
+    ["rough","Смаз и зерно",
+      "are-bure-boke style, grainy, blurry, out of focus",
+      "Make the image grainy, blurry and rough, with motion smearing the figures in an are-bure-boke aesthetic.",
+      "Сырая энергия и антиэстетика","Daido Moriyama"],
+    ["hip","Съёмка от бедра",
+      "hip-level shot, unplanned framing",
+      "Use an unnoticed hip-level viewpoint, with imperfect, spontaneous framing.",
+      "Документальная случайность","Maier, Winogrand"],
+    ["miss_focus","Расфокус героя",
+      "main subject slightly out of focus, background sharp",
+      "Keep the main figure slightly out of focus while the background remains sharp.",
+      "Эмоциональное несовершенство","Leiter"],
+    ["exposure","Пересвет / провал",
+      "blown highlights, crushed shadows, harsh exposure",
+      "Allow blown highlights and crushed shadows, sacrificing exposure precision for the moment.",
+      "Момент важнее техники","Фотожурналистика"],
+    ["flash","Вспышка в лоб",
+      "direct on-camera flash at night, harsh look",
+      "Use harsh direct flash to freeze a startled face against a dark night street.",
+      "Брутальность и прямота","Bruce Gilden"],
+    ["all_over","Хаос без центра",
+      "no single subject, democratic frame, all-over composition",
+      "Give the frame no single dominant subject, letting the viewer discover micro-scenes throughout the image.",
+      "Кадр-головоломка","Winogrand"]
+  ]
+},
+{
+  title:"Дополнение из ваших связок",
+  items:[
+    ["negative","Негативное пространство",
+      "generous negative space, solitary figure against an uncluttered background",
+      "Leave generous uncluttered negative space around the solitary figure, emphasizing their isolation.",
+      "Одиночество и масштаб","Fan Ho, минималистичный стрит"]
+  ]
+}
 ];
 
-function makeObject(type, extras={}){
+const ITEMS=GROUPS.flatMap(g=>g.items);
+const BY_ID=new Map(ITEMS.map(x=>[x[0],x]));
+const PRESETS=[
+  {
+    name:"Слои · полдень · цвет",
+    ids:["layers","color_layers"],
+    time:"hard midday sunlight",
+    hint:"Также устанавливает жёсткий полуденный свет."
+  },
+  {
+    name:"Стекло · акцент · телевик",
+    ids:["glass","accent","tele"],
+    hint:"Оптику и объекты не меняет — проверьте их отдельно."
+  },
+  {
+    name:"Луч · силуэт · масштаб",
+    ids:["shaft","silhouette","scale"]
+  },
+  {
+    name:"Момент · эхо · чистые края",
+    ids:["moment","visual_rhyme","clean_edges"]
+  },
+  {
+    name:"Смаз · обрез · вспышка",
+    ids:["rough","crop","flash"]
+  },
+  {
+    name:"Рама · взгляд · пустота",
+    ids:["frame_in_frame","gaze_out","negative"]
+  }
+];
+
+function normalizeComposition(raw){
+  const ids=Array.isArray(raw?.ids)
+    ?[...new Set(raw.ids.filter(id=>BY_ID.has(id)))]:[];
   return {
-    id:uid(),type,text:kinds[type].text,size:kinds[type].size,
-    depth:kinds[type].depth,x:.5,y:.5,direction:"none",...extras
+    enabled:typeof raw?.enabled==="boolean"?raw.enabled:true,
+    ids
   };
 }
-
-function initialState(){
-  return {
-    config:{
-      scene:"A quiet city street seen from inside a café.",
-      ratio:"3:2",mood:"quiet urban solitude",lens:"135",
-      height:"eye-level viewpoint",distance:"across the street",
-      focus:"middle",time:"blue hour with cool ambient skylight",
-      weather:"light drizzle and wet pavement reflections",
-      film:"portra",imperfection:""
-    },
-    objects:[
-      makeObject("building",{x:.68,y:.36,size:110}),
-      makeObject("person",{
-        x:.65,y:.64,size:65,
-        text:"a woman holding a red umbrella, waiting by the curb"
-      }),
-      makeObject("frame",{x:.5,y:.5,size:158}),
-      makeObject("occluder",{
-        x:.15,y:.85,size:64,text:"a softly blurred café chair"
-      }),
-      makeObject("light",{
-        x:.87,y:.36,size:45,direction:"left",
-        text:"warm light spilling from a shop window"
-      })
-    ]
-  };
+function composition(){
+  if(!state.composition)state.composition=normalizeComposition();
+  return state.composition;
+}
+function selectedItems(){
+  const c=composition();
+  return c.enabled?c.ids.map(id=>BY_ID.get(id)).filter(Boolean):[];
 }
 
-let state = initialState();
-let selected = null;
-let platform = "mj";
-let drag = null;
-let statusTimer;
+/*
+  Оригинальный загрузчик v2 не знает о новом поле.
+  Расширяем валидацию и восстанавливаем поле из localStorage.
+*/
+const originalValidate=validateProject;
+validateProject=function(data){
+  const result=originalValidate(data);
+  result.composition=normalizeComposition(data?.state?.composition);
+  return result;
+};
 
+state.composition=normalizeComposition();
 try{
-  const saved = JSON.parse(localStorage.getItem(KEY) || "null");
-  if(saved && saved.version===1 && saved.state &&
-      Array.isArray(saved.state.objects) && saved.state.config){
-    const candidate = saved.state;
-    const valid = configKeys.every(k => typeof candidate.config[k] === "string")
-      && candidate.objects.every(o =>
-        o && kinds[o.type] && o.depth in depths &&
-        typeof o.id==="string" && typeof o.text==="string" &&
-        Number.isFinite(o.x) && Number.isFinite(o.y) &&
-        Number.isFinite(o.size) &&
-        o.x>=0 && o.x<=1 && o.y>=0 && o.y<=1 &&
-        o.size>=25 && o.size<=170 &&
-        ["none","left","right","up","down"].includes(o.direction)
-      );
-    if(valid) state = candidate;
-  }
-}catch(e){ /* Local storage may be unavailable. */ }
-
-function syncControls(){
-  for(const k of configKeys){
-    $(k).value = state.config[k];
-    if($(k).tagName==="SELECT" && $(k).selectedIndex<0){
-      $(k).selectedIndex=0;
-      state.config[k]=$(k).value;
+  const saved=JSON.parse(localStorage.getItem(STORE)||"null");
+  if(saved){
+    const checked=validateProject(saved);
+    // Не подменяем текущую сцену, если базовый загрузчик её не восстановил.
+    if(JSON.stringify(checked.objects)===JSON.stringify(state.objects)){
+      state.composition=checked.composition;
     }
   }
-}
-syncControls();
+}catch{}
 
-function dimensions(){
-  const [w,h] = state.config.ratio.split(":").map(Number);
-  return {w:1000,h:1000*h/w};
-}
+const originalExample=example;
+example=function(){
+  const result=originalExample();
+  result.composition=normalizeComposition();
+  return result;
+};
 
-function say(text){
-  $("status").textContent=text;
-  clearTimeout(statusTimer);
-  statusTimer=setTimeout(()=>{$("status").textContent="";},4500);
-}
+// ---------- Интерфейс каталога ----------
+const panel=document.createElement("section");
+panel.id="compositionPanel";
+panel.className="panel";
+panel.innerHTML=`
+  <div class="comp-switch">
+    <h2 style="margin:0">Композиционные приёмы</h2>
+    <input id="compEnabled" type="checkbox"
+      aria-label="Включить композиционные приёмы в промпт">
+  </div>
+  <p class="muted">
+    58 приёмов + негативное пространство.
+    Общий переключатель отключает их влияние, сохраняя выбор.
+  </p>
+  <div id="compSelected"></div>
+  <div id="compBody">
+    <label for="compSearch">Найти приём, эффект или фотографа</label>
+    <input id="compSearch" type="search"
+      placeholder="Стекло, силуэт, Leiter…">
+    <details id="compPresets">
+      <summary>Быстрые сочетания</summary>
+      <div id="compPresetButtons" class="buttons" style="margin-top:10px"></div>
+      <p class="muted">
+        Сочетание заменяет текущий набор.
+        Только «Слои · полдень · цвет» дополнительно меняет окружающий свет.
+      </p>
+    </details>
+    <div class="buttons" style="margin-top:10px">
+      <button id="compClear" type="button">Снять все</button>
+      <span id="compCount" class="muted"></span>
+    </div>
+    <div id="compResults"></div>
+  </div>
+  <p class="comp-note">
+    2–3 приёма — удобный ориентир, не жёсткий лимит.
+    В примерах есть конкретные предметы и действия:
+    проверяйте, соответствуют ли они вашему сюжету.
+  </p>
+`;
 
-function drawArrow(dir,color,length=75){
-  const ends={left:[-length,0],right:[length,0],up:[0,-length],down:[0,length]};
-  if(!ends[dir]) return "";
-  const [x,y]=ends[dir];
-  const angle=Math.atan2(y,x);
-  const p1=[x-16*Math.cos(angle-.45),y-16*Math.sin(angle-.45)];
-  const p2=[x-16*Math.cos(angle+.45),y-16*Math.sin(angle+.45)];
-  return `<path d="M0 0 L${x} ${y} M${p1[0]} ${p1[1]} L${x} ${y} L${p2[0]} ${p2[1]}"
-    fill="none" stroke="${color}" stroke-width="4" stroke-linecap="round"/>`;
-}
+const left=document.querySelector(".left");
+left.insertBefore(panel,left.children[1]||null);
 
-function objectShape(o){
-  const active=o.id===selected;
-  const stroke=active?"#b6f36d":"#a8b6cd";
-  let shape="";
-  if(o.type==="person"){
-    shape=`
-      <circle cx="0" cy="-46" r="18" fill="#f1c08e"/>
-      <path d="M-24 -20 Q0 -33 24 -20 L31 39 L-31 39Z" fill="#7797cc" stroke="${stroke}" stroke-width="2"/>
-      <path d="M-13 39 L-17 72 M13 39 L20 72 M-23 -11 L-40 27 M23 -11 L39 23"
-        stroke="${stroke}" stroke-width="10" stroke-linecap="round"/>
-      ${o.direction!=="none"?`<g transform="translate(0,95)">${drawArrow(o.direction,"#b6f36d",65)}</g>`:""}`;
-  }
-  if(o.type==="building"){
-    shape=`<rect x="-80" y="-95" width="160" height="190" rx="4"
-      fill="#2b3a51" stroke="${stroke}" stroke-width="2"/>`;
-    for(let y=-65;y<70;y+=45){
-      for(let x=-53;x<65;x+=43){
-        shape+=`<rect x="${x}" y="${y}" width="20" height="25" fill="#d2b470" opacity=".7"/>`;
-      }
-    }
-  }
-  if(o.type==="frame"){
-    shape=`<rect x="-170" y="-120" width="340" height="240" rx="3"
-      fill="none" stroke="#070b12" stroke-width="18"/>
-      <rect x="-170" y="-120" width="340" height="240" rx="3"
-      fill="none" stroke="${stroke}" stroke-width="2"/>
-      <path d="M-170 -120 L170 120" stroke="${stroke}" stroke-opacity=".18" stroke-width="2"/>`;
-  }
-  if(o.type==="occluder"){
-    shape=`<ellipse cx="0" cy="0" rx="58" ry="85"
-      fill="#101722" fill-opacity=".9" stroke="${stroke}" stroke-width="2" stroke-dasharray="5 5"/>`;
-  }
-  if(o.type==="light"){
-    shape=`<circle r="29" fill="#ffd886" fill-opacity=".15"/>
-      <circle r="13" fill="#ffd886"/>
-      <path d="M0 -43 V-33 M0 33 V43 M-43 0 H-33 M33 0 H43
-        M-30 -30 L-23 -23 M30 30 L23 23 M-30 30 L-23 23 M30 -30 L23 -23"
-        stroke="#ffd886" stroke-width="3"/>
-      ${drawArrow(o.direction,"#ffd886",115)}`;
-  }
-  return shape;
-}
+const catalog=$("compResults");
+GROUPS.forEach((group,index)=>{
+  const section=document.createElement("details");
+  section.className="comp-section";
+  section.open=index===0;
+  section.dataset.group=String(index);
 
-function draw(){
-  const {w,h}=dimensions();
-  const svg=$("canvas");
-  svg.setAttribute("viewBox",`0 0 ${w} ${h}`);
-  const grid=$("grid").checked
-    ? `<path d="M${w/3} 0 V${h} M${w*2/3} 0 V${h}
-        M0 ${h/3} H${w} M0 ${h*2/3} H${w}"
-        stroke="#b3c4df" stroke-opacity=".22" stroke-dasharray="7 7" fill="none"/>`
-    :"";
-  svg.innerHTML=`
-    <rect width="${w}" height="${h}" fill="#151d2a"/>
-    <rect y="${h*.62}" width="${w}" height="${h*.38}" fill="#1c2937"/>
-    <path d="M0 ${h*.62} H${w}" stroke="#354357"/>
-    ${grid}
-    <text x="18" y="27" fill="#8192ac" font-size="15" font-family="system-ui">
-      СХЕМА · НЕ ПРЕВЬЮ ИЗОБРАЖЕНИЯ
-    </text>`;
+  const summary=document.createElement("summary");
+  summary.textContent=group.title;
+  section.append(summary);
 
-  const sorted=[...state.objects].sort((a,b)=>
-    ((a.type==="light"?3:depths[a.depth]) -
-     (b.type==="light"?3:depths[b.depth])));
-  const unit=Math.min(w,h)/650;
-
-  sorted.forEach(o=>{
-    const g=document.createElementNS(SVG_NS,"g");
-    g.dataset.id=o.id;
-    g.style.cursor="grab";
-    g.setAttribute("transform",`translate(${o.x*w},${o.y*h}) scale(${o.size/80*unit})`);
-    g.setAttribute("role","button");
-    g.setAttribute("tabindex","0");
-    g.setAttribute("aria-label",`${kinds[o.type].name}: ${o.text}`);
-    g.innerHTML=`
-      <title>${esc(o.text)}</title>
-      ${objectShape(o)}
-      <text x="0" y="${o.type==="person"?132:o.type==="frame"?148:o.type==="building"?122:112}"
-        text-anchor="middle" fill="${o.id===selected?"#b6f36d":"#c4cee0"}"
-        font-size="17" font-family="system-ui" paint-order="stroke"
-        stroke="#101722" stroke-width="4" stroke-linejoin="round">${esc(kinds[o.type].name)}</text>`;
-    svg.appendChild(g);
-  });
-}
-
-function renderLayers(){
-  const box=$("layers");
-  box.innerHTML="";
-  if(!state.objects.length){
-    box.textContent="Схема пустая. Добавьте героя.";
-    return;
-  }
-  state.objects.forEach(o=>{
+  for(const item of group.items){
+    const [id,name,mj,nb,effect,master]=item;
     const row=document.createElement("div");
-    row.className="layer"+(selected===o.id?" active":"");
-    const b=document.createElement("button");
-    b.textContent=`${kinds[o.type].name} · ${o.text}`;
-    b.title=o.text;
-    b.onclick=()=>select(o.id);
-    const d=document.createElement("span");
-    d.textContent=depthNames[o.depth];
-    row.append(b,d);
-    box.appendChild(row);
-  });
-}
+    row.className="comp-item";
+    row.dataset.compItem=id;
+    row.dataset.search=item.join(" ").toLocaleLowerCase("ru");
 
-function current(){return state.objects.find(o=>o.id===selected)}
+    const labelEl=document.createElement("label");
+    const checkbox=document.createElement("input");
+    checkbox.type="checkbox";
+    checkbox.dataset.compId=id;
+    const title=document.createElement("span");
+    title.textContent=name;
+    labelEl.append(checkbox,title);
 
-function syncEditor(){
-  const o=current();
-  $("editor").classList.toggle("hidden",!o);
-  $("emptyEditor").classList.toggle("hidden",!!o);
-  if(!o)return;
-  $("objText").value=o.text;
-  $("objDepth").value=o.depth;
-  $("objSize").value=o.size;
-  $("objX").value=Math.round(o.x*100);
-  $("objY").value=Math.round(o.y*100);
-  $("objDirection").value=o.direction;
-  $("directionGroup").classList.toggle("hidden",!["person","light"].includes(o.type));
-  $("directionLabel").textContent=o.type==="light"
-    ?"Направление света на схеме":"Движение в плоскости кадра";
-}
+    const desc=document.createElement("div");
+    desc.className="comp-desc";
+    desc.textContent=effect+" · "+master;
 
-function select(id){
-  selected=id;
-  draw();renderLayers();syncEditor();
-}
-
-function positionText(o){
-  const horizontal=o.x<.35?"left third":o.x>.65?"right third":"central third";
-  const vertical=o.y<.34?"upper part":o.y>.67?"lower part":"middle height";
-  return `${horizontal} of the frame, in its ${vertical}`;
-}
-
-function objectDescription(o){
-  const label=o.text.trim() || kinds[o.type].text;
-  let t=`Place ${label} in the ${o.depth}, at the ${positionText(o)}`;
-  if(o.type==="person"){
-    const movement={
-      left:"moving toward the left edge",
-      right:"moving toward the right edge",
-      up:"moving toward the top of the image",
-      down:"moving toward the bottom of the image"
-    };
-    if(movement[o.direction]) t+=`, ${movement[o.direction]}`;
-    t+=o.size<50?", occupying a small part of the image"
-      :o.size>115?", occupying a large part of the image":"";
+    const examples=document.createElement("details");
+    examples.className="comp-example";
+    const heading=document.createElement("summary");
+    heading.textContent="Формулировки MJ / NB";
+    const pMJ=document.createElement("p");
+    pMJ.textContent="MJ: "+mj;
+    const pNB=document.createElement("p");
+    pNB.textContent="NB: "+nb;
+    examples.append(heading,pMJ,pNB);
+    row.append(labelEl,desc,examples);
+    section.append(row);
   }
-  if(o.type==="frame"){
-    t+="; use this element as a visible frame-within-the-frame around the street scene";
-  }
-  if(o.type==="occluder"){
-    t+="; it partially obstructs the view without fully hiding the main subject";
-  }
-  if(o.type==="light"){
-    t=`Position ${label} at the ${positionText(o)}`;
-    const direction={
-      left:"direct its light toward the left side of the image",
-      right:"direct its light toward the right side of the image",
-      up:"direct its light upward in the image",
-      down:"direct its light downward in the image"
-    };
-    if(direction[o.direction])t+=`; ${direction[o.direction]}`;
-    t+=". Treat the diagram symbol as a lighting instruction, not a graphic to draw";
-  }
-  return t+".";
-}
+  catalog.append(section);
+});
 
-function buildPrompts(){
-  const c=state.config;
-  const order={person:0,building:1,frame:2,occluder:3,light:4};
-  const ordered=[...state.objects].sort((a,b)=>order[a.type]-order[b.type]);
-  const layout=ordered.map(objectDescription).join(" ");
-  const scene=c.scene.trim() || "An everyday urban street scene.";
-  const camera=`Use a ${c.height}, observing the main subject from ${c.distance}, with a ${c.lens}mm full-frame-equivalent field of view.`;
-  const atmosphere=`The scene is set at ${c.time}, with ${c.weather}.`;
-  const look=`Render ${films[c.film]}.`;
-  const focus=focusText[c.focus]+".";
-  const extra=c.imperfection?`Include ${c.imperfection}.`:"";
-  const finish=`The mood is ${c.mood}. Keep the result candid, unposed and photographically plausible.`;
-  const blocks=[scene,layout,camera,focus,atmosphere,look,extra,finish].filter(Boolean);
-
-  return {
-    mj:["Candid street photograph.",...blocks,`--ar ${c.ratio}`].join(" "),
-    nb:[
-      "Create a candid documentary-style street photograph.",
-      ...blocks,
-      `Compose the image in a ${c.ratio} aspect ratio.`,
-      "Translate the layout into a real photographic scene; do not include diagram labels, arrows or construction guides."
-    ].join(" ")
+PRESETS.forEach(preset=>{
+  const b=document.createElement("button");
+  b.type="button";
+  b.textContent=preset.name;
+  b.title=preset.hint||"Заменить набор выбранных приёмов";
+  b.onclick=()=>{
+    change(()=>{
+      state.composition={enabled:true,ids:[...preset.ids]};
+      if(preset.time)state.config.time=preset.time;
+    });
+    say("Сочетание применено. "+(preset.hint||"Проверьте соответствие сцене."));
   };
+  $("compPresetButtons").append(b);
+});
+
+$("compEnabled").onchange=()=>{
+  change(()=>composition().enabled=$("compEnabled").checked);
+};
+$("compClear").onclick=()=>{
+  change(()=>composition().ids=[]);
+};
+catalog.addEventListener("change",e=>{
+  const input=e.target.closest("[data-comp-id]");
+  if(!input)return;
+  const id=input.dataset.compId;
+  change(()=>{
+    const c=composition();
+    if(input.checked){
+      if(!c.ids.includes(id))c.ids.push(id);
+    }else c.ids=c.ids.filter(x=>x!==id);
+  });
+});
+
+$("compSearch").oninput=()=>{
+  const q=$("compSearch").value.trim().toLocaleLowerCase("ru");
+  for(const section of catalog.querySelectorAll(".comp-section")){
+    let found=0;
+    for(const row of section.querySelectorAll(".comp-item")){
+      const match=!q||row.dataset.search.includes(q);
+      row.hidden=!match;
+      if(match)found++;
+    }
+    section.hidden=found===0;
+    if(q&&found)section.open=true;
+  }
+};
+
+function renderComposition(){
+  const c=composition();
+  $("compEnabled").checked=c.enabled;
+  $("compBody").classList.toggle("comp-disabled",!c.enabled);
+  $("compCount").textContent=
+    `Выбрано: ${c.ids.length}${c.enabled?"":" · выключено"}`;
+
+  for(const input of catalog.querySelectorAll("[data-comp-id]")){
+    input.checked=c.ids.includes(input.dataset.compId);
+  }
+
+  const chips=$("compSelected");
+  chips.replaceChildren();
+  for(const id of c.ids){
+    const item=BY_ID.get(id);
+    if(!item)continue;
+    const b=document.createElement("button");
+    b.type="button";
+    b.className="comp-chip";
+    b.textContent=item[1]+" ×";
+    b.title="Убрать приём";
+    b.onclick=()=>change(()=>{
+      composition().ids=composition().ids.filter(x=>x!==id);
+    });
+    chips.append(b);
+  }
 }
 
-function updateOutput(){
-  const prompts=buildPrompts();
-  $("output").value=prompts[platform];
-  $("tabMJ").classList.toggle("active",platform==="mj");
-  $("tabNB").classList.toggle("active",platform==="nb");
+// ---------- Добавление в промпты ----------
+const originalPrompts=prompts;
+prompts=function(){
+  const base=originalPrompts();
+  const items=selectedItems();
+  if(!items.length)return base;
 
-  const notes=[];
-  const people=state.objects.filter(o=>o.type==="person");
-  const lights=state.objects.filter(o=>o.type==="light");
+  const scene=state.config.scene.trim()||"An everyday urban street scene.";
 
-  if(!people.length)notes.push("Нет героя: это допустимо для пустой улицы или следов человеческого присутствия.");
-  if(lights.length>2)notes.push("Больше двух источников света: обозначьте доминирующий источник в его описании.");
-  if(state.objects.length>7)notes.push("Много объектов: модель может упростить композицию. Попробуйте оставить главное.");
-  if(state.config.focus==="middle" && !state.objects.some(o=>o.type!=="light"&&o.depth==="midground")){
-    notes.push("Выбрана резкость среднего плана, но в нём нет объектов.");
+  function insertAfterScene(text,addition){
+    const i=text.indexOf(scene);
+    if(i<0)return text+" "+addition;
+    const at=i+scene.length;
+    return text.slice(0,at)+" "+addition+" "+text.slice(at).trimStart();
   }
-  const allText=state.config.scene+" "+state.objects.map(o=>o.text).join(" ");
-  if(/[а-яё]/i.test(allText)){
-    notes.push("В свободных описаниях есть русский текст. Он останется в промпте: встроенного перевода нет.");
+
+  base.mj=insertAfterScene(
+    base.mj,
+    "Composition: "+items.map(x=>x[2]).join("; ")+"."
+  );
+  base.nb=insertAfterScene(
+    base.nb,
+    items.map(x=>x[3]).join(" ")
+  );
+  return base;
+};
+
+// ---------- Мягкая проверка конфликтов ----------
+const originalUpdateOutput=updateOutput;
+updateOutput=function(){
+  originalUpdateOutput();
+
+  const items=selectedItems();
+  if(!items.length)return;
+  const ids=new Set(items.map(x=>x[0]));
+  const warnings=[];
+  const has=id=>ids.has(id);
+  const pair=(a,b,message)=>{
+    if(has(a)&&has(b))warnings.push(message);
+  };
+  const objects=state.objects.filter(active);
+  const hero=objects.find(o=>o.main);
+  const people=objects.filter(o=>o.type==="person");
+
+  if(items.length>3){
+    warnings.push(
+      "Выбрано больше трёх композиционных приёмов. Это разрешено, " +
+      "но конкурирующие инструкции могут ослабить основной замысел."
+    );
   }
-  if(["trix","hp5"].includes(state.config.film) &&
-     /\b(red|blue|green|yellow|magenta|cyan|orange)\b/i.test(allText)){
-    notes.push("Выбран ч/б, но в описаниях есть цвет. Если нужен видимый цветовой акцент, явно задайте выборочное окрашивание или смените эстетику.");
-  }
-  notes.push("Размеры и позиции переводятся в словесные ориентиры, а не в точные координаты генератора.");
-  $("warnings").replaceChildren(...notes.map(t=>{
+
+  pair("thirds","symmetry",
+    "Правило третей и центральная симметрия предлагают разное положение главного героя.");
+  pair("low_horizon","high_horizon",
+    "Одновременно выбраны низкий и высокий горизонт.");
+  pair("low_key","high_key",
+    "Низкий и высокий ключ задают противоположное распределение тонов.");
+  pair("clean_edges","crop",
+    "Чистые края и агрессивный обрез могут противоречить друг другу.");
+  pair("gaze_out","eye_contact",
+    "Взгляд за пределы кадра и взгляд в камеру конфликтуют, если относятся к одному герою.");
+  pair("near_far","tele",
+    "Ближний-дальний и телекомпрессия предполагают разные пространственные решения.");
+  pair("silhouette","eye_contact",
+    "У силуэта без деталей лица прямой зрительный контакт может быть неразличим.");
+  pair("layers","middle_focus",
+    "В MJ трёхплановость из таблицы включает deep focus, а эшелон резкости размывает передний и задний планы.");
+  pair("mono_palette","neon",
+    "Гамма одного оттенка конкурирует с двухцветной неоновой палитрой.");
+
+  if(has("absence")&&people.length)
+    warnings.push("Приём «Отсутствие человека» выбран, но в сцене есть активные герои.");
+
+  if(has("all_over")&&hero)
+    warnings.push("Выбран кадр без центра, но один объект помечен главным.");
+
+  if(has("thirds")&&hero&&hero.x>.4)
+    warnings.push("Формулировка правила третей ставит героя слева, а на схеме он расположен иначе.");
+
+  if(has("symmetry")&&hero&&Math.abs(hero.x-.5)>.08)
+    warnings.push("Для центральной композиции главный объект на схеме заметно смещён от центра.");
+
+  if(has("triangle")&&people.length!==3)
+    warnings.push("Приём «Треугольники» описывает трёх персонажей; число героев на схеме другое.");
+
+  if(has("tele")&&Number(state.config.lens)<85)
+    warnings.push("Телекомпрессия выбрана вместе с широким или нормальным полем зрения. Проверьте дистанцию и оптику.");
+
+  if(has("near_far")&&Number(state.config.lens)>35)
+    warnings.push("Пример «Ближний-дальний» предполагает широкий угол; выбран более узкий.");
+
+  if(has("hip")&&state.config.height!=="hip-level viewpoint")
+    warnings.push("Приём «Съёмка от бедра» не совпадает с выбранной точкой камеры.");
+
+  if(has("miss_focus")&&state.config.focus==="subject")
+    warnings.push("Расфокус героя противоречит настройке «Герой резкий, фон мягкий».");
+
+  if(has("middle_focus")&&state.config.focus==="deep")
+    warnings.push("Эшелон резкости конфликтует с общей настройкой читаемости всех планов.");
+
+  if(has("flash")&&!state.config.time.includes("night"))
+    warnings.push("Табличный пример вспышки описывает ночь, а окружающий свет задан иначе.");
+
+  if(has("shaft")&&state.config.time.includes("night"))
+    warnings.push("Пример луча света описывает солнце между зданиями, но сцена настроена на ночь.");
+
+  const colorIds=["accent","pattern_break","complementary","color_blocks",
+    "mono_palette","color_layers","neon"];
+
+  if(["trix","hp5"].includes(state.config.film)&&colorIds.some(has))
+    warnings.push("Цветовые композиционные приёмы выбраны вместе с чёрно-белой эстетикой.");
+
+  for(const text of warnings){
     const p=document.createElement("p");
-    p.textContent="• "+t;
-    return p;
-  }));
-}
-
-function refresh(){
-  draw();renderLayers();syncEditor();updateOutput();
-}
-
-for(const key of configKeys){
-  $(key).addEventListener("input",()=>{
-    state.config[key]=$(key).value;
-    draw();updateOutput();
-  });
-}
-$("grid").onchange=draw;
-
-$("tools").onclick=e=>{
-  const b=e.target.closest("[data-add]");
-  if(!b)return;
-  const o=makeObject(b.dataset.add,{
-    x:clamp(.45+Math.random()*.15,0,1),
-    y:clamp(.45+Math.random()*.15,0,1)
-  });
-  state.objects.push(o);
-  selected=o.id;
-  refresh();
+    p.textContent="• Композиция: "+text;
+    p.style.color="#e2c58e";
+    $("warnings").append(p);
+  }
 };
 
-const propertyBindings={
-  objText:["text",v=>v],
-  objDepth:["depth",v=>v],
-  objSize:["size",v=>clamp(Number(v),25,170)],
-  objX:["x",v=>clamp(Number(v)/100,0,1)],
-  objY:["y",v=>clamp(Number(v)/100,0,1)],
-  objDirection:["direction",v=>v]
-};
+// ---------- Световое пятно ----------
+const stage=document.querySelector(".center .stage");
+const lightToggle=document.createElement("label");
+lightToggle.className="check muted";
+lightToggle.innerHTML=`
+  <input id="showLightSpots" type="checkbox" checked>
+  Показывать условные световые пятна
+`;
+stage.after(lightToggle);
+$("showLightSpots").onchange=()=>draw();
 
-Object.entries(propertyBindings).forEach(([id,[key,convert]])=>{
-  $(id).addEventListener("input",()=>{
-    const o=current();if(!o)return;
-    o[key]=convert($(id).value);
-    draw();renderLayers();updateOutput();
-  });
-});
+function lightSpotsMarkup(){
+  if(!$("showLightSpots")?.checked)return "";
+  const {w,h}=dims();
+  const objects=state.objects.filter(o=>!o.hidden);
+  let result="";
 
-$("delete").onclick=()=>{
-  state.objects=state.objects.filter(o=>o.id!==selected);
-  selected=null;refresh();
-};
-$("duplicate").onclick=()=>{
-  const o=current();if(!o)return;
-  const copy={...o,id:uid(),x:clamp(o.x+.06,.02,.98),y:clamp(o.y+.04,.02,.98)};
-  state.objects.push(copy);selected=copy.id;refresh();
-};
+  for(const source of objects.filter(o=>o.type==="light")){
+    const target=objects.find(o=>o.id===source.target)
+      ||objects.find(o=>o.main);
 
-function canvasPoint(e){
-  const svg=$("canvas");
-  const p=svg.createSVGPoint();
-  p.x=e.clientX;p.y=e.clientY;
-  const matrix=svg.getScreenCTM();
-  return matrix?p.matrixTransform(matrix.inverse()):null;
+    const x=(target?.x??source.x)*w;
+    const y=(target?.y??source.y)*h;
+    const sizeW=target?Math.max(target.w*w*1.4,90):w*.18;
+    const sizeH=target?Math.max(target.h*h*.8,75):h*.2;
+    const soft=source.lightQuality==="soft";
+    const color={
+      warm:"#ffd08b",
+      neutral:"#e9f0ff",
+      cool:"#87caff"
+    }[source.lightColor]||"#e9f0ff";
+
+    const shift={
+      left:[-sizeW*.3,0],
+      right:[sizeW*.3,0],
+      above:[0,-sizeH*.28],
+      behind:[0,0],
+      front:[0,0]
+    }[source.lightPosition]||[0,0];
+
+    const cx=x+shift[0],cy=y+shift[1];
+    const gradientId="frame-light-"+source.id;
+    const opacity=source.lightRole==="key"?.38:.22;
+
+    result+=`
+      <defs>
+        <radialGradient id="${gradientId}">
+          <stop offset="0" stop-color="${color}" stop-opacity="${opacity}"/>
+          <stop offset="${soft?"50%":"78%"}"
+            stop-color="${color}" stop-opacity="${opacity*.5}"/>
+          <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <ellipse cx="${cx}" cy="${cy}" rx="${sizeW}" ry="${sizeH}"
+        fill="url(#${gradientId})" pointer-events="none"/>`;
+
+    if(source.lightPosition==="behind"){
+      result+=`
+        <ellipse cx="${x}" cy="${y}" rx="${sizeW*.6}" ry="${sizeH*.8}"
+          fill="none" stroke="${color}" stroke-opacity=".35"
+          stroke-width="5" pointer-events="none"/>`;
+    }
+  }
+  return result;
 }
 
-$("canvas").addEventListener("pointerdown",e=>{
-  const g=e.target.closest("[data-id]");
-  if(!g){select(null);return}
+const originalSvgContent=svgContent;
+svgContent=function(mode="editor"){
+  let content=originalSvgContent(mode);
+  if(mode==="clean")return content;
+
+  const glow=lightSpotsMarkup();
+  if(glow){
+    // Ставим пятна поверх фоновой заливки, но под объектами.
+    const marker='fill="#223044"/>';
+    const index=content.indexOf(marker);
+    if(index>=0){
+      const at=index+marker.length;
+      content=content.slice(0,at)+glow+content.slice(at);
+    }
+  }
+  return content;
+};
+
+// ---------- Ручки изменения размера ----------
+let resizeSession=null;
+const canvas=$("canvas");
+
+const originalDraw=draw;
+draw=function(){
+  originalDraw();
+  const o=current();
+  if(!o||o.hidden||o.locked)return;
+
+  const {w,h}=dims();
+  const ow=o.w*w,oh=o.h*h;
+  const group=document.createElementNS(NS,"g");
+  group.setAttribute(
+    "transform",
+    `translate(${o.x*w} ${o.y*h}) rotate(${o.rotation})`
+  );
+  group.setAttribute("aria-hidden","true");
+
+  const handles=[
+    ["nw",-ow/2,-oh/2,"nwse-resize"],
+    ["n",0,-oh/2,"ns-resize"],
+    ["ne",ow/2,-oh/2,"nesw-resize"],
+    ["e",ow/2,0,"ew-resize"],
+    ["se",ow/2,oh/2,"nwse-resize"],
+    ["s",0,oh/2,"ns-resize"],
+    ["sw",-ow/2,oh/2,"nesw-resize"],
+    ["west",-ow/2,0,"ew-resize"]
+  ];
+
+  for(const [name,x,y,cursor] of handles){
+    const rect=document.createElementNS(NS,"rect");
+    rect.dataset.resize=name;
+    rect.setAttribute("x",x-7);
+    rect.setAttribute("y",y-7);
+    rect.setAttribute("width","14");
+    rect.setAttribute("height","14");
+    rect.setAttribute("rx","3");
+    rect.setAttribute("fill","#b7ed78");
+    rect.setAttribute("stroke","#101721");
+    rect.setAttribute("stroke-width","2");
+    rect.style.cursor=cursor;
+    group.append(rect);
+  }
+  canvas.append(group);
+};
+
+canvas.addEventListener("pointerdown",e=>{
+  const handle=e.target.closest("[data-resize]");
+  if(!handle||e.button!==0)return;
+  const o=current();
+  if(!o||o.locked)return;
+  const p=point(e);
+  if(!p)return;
+
   e.preventDefault();
-  const p=canvasPoint(e);if(!p)return;
-  const o=state.objects.find(x=>x.id===g.dataset.id);
-  const {w,h}=dimensions();
-  selected=o.id;
-  drag={id:o.id,dx:p.x-o.x*w,dy:p.y-o.y*h,pointerId:e.pointerId};
-  $("canvas").setPointerCapture(e.pointerId);
-  draw();renderLayers();syncEditor();
-});
+  e.stopImmediatePropagation();
 
-$("canvas").addEventListener("pointermove",e=>{
-  if(!drag || e.pointerId!==drag.pointerId)return;
-  const p=canvasPoint(e);if(!p)return;
-  const o=state.objects.find(x=>x.id===drag.id);
-  if(!o)return;
-  const {w,h}=dimensions();
-  o.x=clamp((p.x-drag.dx)/w,0,1);
-  o.y=clamp((p.y-drag.dy)/h,0,1);
-  draw();syncEditor();updateOutput();
-});
+  const {w,h}=dims();
+  const angle=o.rotation*Math.PI/180;
+  resizeSession={
+    pointer:e.pointerId,
+    id:o.id,
+    handle:handle.dataset.resize,
+    before:serialize(),
+    centerX:o.x*w,
+    centerY:o.y*h,
+    cos:Math.cos(angle),
+    sin:Math.sin(angle),
+    originalW:o.w,
+    originalH:o.h
+  };
+  canvas.setPointerCapture(e.pointerId);
+  canvas.focus({preventScroll:true});
+},true);
 
-function endDrag(){drag=null}
-$("canvas").addEventListener("pointerup",endDrag);
-$("canvas").addEventListener("pointercancel",endDrag);
-$("canvas").addEventListener("lostpointercapture",endDrag);
+canvas.addEventListener("pointermove",e=>{
+  if(!resizeSession||resizeSession.pointer!==e.pointerId)return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
 
-$("canvas").addEventListener("keydown",e=>{
-  const g=e.target.closest("[data-id]");
-  if(g && (e.key==="Enter"||e.key===" ")){
-    e.preventDefault();select(g.dataset.id);
+  const s=resizeSession;
+  const o=state.objects.find(x=>x.id===s.id);
+  const p=point(e);
+  if(!o||!p)return;
+
+  const {w,h}=dims();
+  const dx=p.x-s.centerX,dy=p.y-s.centerY;
+
+  // Координаты указателя в локальной системе повёрнутого объекта.
+  const localX=dx*s.cos+dy*s.sin;
+  const localY=-dx*s.sin+dy*s.cos;
+
+  const horizontal=!["n","s"].includes(s.handle);
+  const vertical=!["e","west"].includes(s.handle);
+
+  let nextW=horizontal?Math.abs(localX)*2/w:s.originalW;
+  let nextH=vertical?Math.abs(localY)*2/h:s.originalH;
+
+  if(e.shiftKey){
+    let factor;
+    if(horizontal&&vertical){
+      factor=Math.max(nextW/s.originalW,nextH/s.originalH);
+    }else factor=horizontal?nextW/s.originalW:nextH/s.originalH;
+
+    const minFactor=Math.max(.02/s.originalW,.02/s.originalH);
+    const maxFactor=Math.min(1.5/s.originalW,1.5/s.originalH);
+    factor=clamp(factor,minFactor,maxFactor);
+
+    nextW=s.originalW*factor;
+    nextH=s.originalH*factor;
   }
-});
 
-$("tabMJ").onclick=()=>{platform="mj";updateOutput()};
-$("tabNB").onclick=()=>{platform="nb";updateOutput()};
+  o.w=clamp(nextW,.02,1.5);
+  o.h=clamp(nextH,.02,1.5);
 
-$("copy").onclick=async()=>{
-  const text=$("output").value;
-  try{
-    if(!navigator.clipboard)throw new Error("Clipboard unavailable");
-    await navigator.clipboard.writeText(text);
-    say("Промпт скопирован.");
-  }catch(e){
-    $("output").focus();$("output").select();
-    say("Текст выделен. Нажмите Ctrl+C или Cmd+C.");
-  }
-};
+  draw();
+  syncEditor();
+  updateOutput();
+},true);
 
-function download(name,text,type){
-  const blob=new Blob([text],{type});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url;a.download=name;
-  document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),2000);
+function finishResize(e){
+  if(!resizeSession)return;
+  if(e.pointerId!==undefined&&e.pointerId!==resizeSession.pointer)return;
+  e.stopImmediatePropagation();
+  const before=resizeSession.before;
+  resizeSession=null;
+  remember(before);
+  render();
+}
+for(const event of ["pointerup","pointercancel","lostpointercapture"]){
+  canvas.addEventListener(event,finishResize,true);
 }
 
-$("downloadPrompt").onclick=()=>{
-  download(`street-prompt-${platform}.txt`,$("output").value,"text/plain;charset=utf-8");
+// Не допускаем удаления объекта горячей клавишей во время resize.
+document.addEventListener("keydown",e=>{
+  if(!resizeSession)return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+},true);
+
+// ---------- Обновление общего интерфейса ----------
+const originalRender=render;
+render=function(){
+  composition();
+  originalRender();
+  renderComposition();
 };
 
-$("save").onclick=()=>{
-  try{
-    localStorage.setItem(KEY,JSON.stringify({version:1,state}));
-    say("Проект сохранён в этом браузере.");
-  }catch(e){
-    download("frame-project.json",JSON.stringify({version:1,state},null,2),"application/json");
-    say("Хранилище браузера недоступно. Скачана резервная копия JSON.");
-  }
-};
+const resizeHelp=document.createElement("p");
+resizeHelp.className="muted";
+resizeHelp.textContent=
+  "Размер: потяните зелёные ручки выбранного объекта. " +
+  "Изменение идёт относительно его центра. " +
+  "Shift сохраняет пропорции. Точные значения доступны справа.";
+lightToggle.after(resizeHelp);
 
-$("exportSvg").onclick=()=>{
-  const old=selected;
-  selected=null;draw();
-  const clone=$("canvas").cloneNode(true);
-  const {w,h}=dimensions();
-  clone.setAttribute("width",w);
-  clone.setAttribute("height",h);
-  clone.querySelectorAll("[data-id]").forEach(g=>{
-    g.removeAttribute("tabindex");
-    g.removeAttribute("role");
-    g.removeAttribute("style");
-  });
-  const xml=new XMLSerializer().serializeToString(clone);
-  selected=old;draw();
-  download("frame-scheme.svg",xml,"image/svg+xml;charset=utf-8");
-};
-
-$("preset").onclick=()=>{
-  if(!confirm("Заменить текущий проект примером «За стеклом»?"))return;
-  state=initialState();selected=null;
-  syncControls();refresh();say("Пример загружен. Для сохранения нажмите «Сохранить».");
-};
-$("clear").onclick=()=>{
-  if(!confirm("Удалить все объекты? Настройки съёмки останутся."))return;
-  state.objects=[];selected=null;refresh();
-};
-
-refresh();
+render();
+say("Добавлены композиционные приёмы, изменение размера и световые пятна.");
+})();
 </script>
-</body>
-</html>
