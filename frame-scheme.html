@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Схема кадра — конструктор промптов</title>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#101218;--panel:#191d27;--line:#303747;
+  --text:#edf0f7;--muted:#a6afc1;--accent:#b6f36d;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;
+}
+header{
+  padding:20px 25px;border-bottom:1px solid var(--line);
+  display:flex;gap:20px;align-items:center;justify-content:space-between;
+}
+h1{font-size:23px;margin:0}
+h2{font-size:16px;margin:0 0 14px}
+p{margin:6px 0}
+.small{font-size:12px;color:var(--muted)}
+.badge{color:var(--accent);font-size:12px}
+.layout{
+  display:grid;grid-template-columns:270px minmax(350px,1fr) 310px;
+  gap:16px;padding:18px;max-width:1700px;margin:auto;
+}
+.panel{
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:14px;padding:17px;margin-bottom:15px;
+}
+label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px}
+input,select,textarea,button{
+  font:inherit;border-radius:8px;border:1px solid var(--line);
+}
+input,select,textarea{
+  width:100%;padding:9px;background:#11151e;color:var(--text);
+}
+textarea{resize:vertical}
+button{
+  padding:9px 12px;background:#252c3a;color:var(--text);cursor:pointer;
+}
+button:hover{border-color:var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;
+}
+button.primary{background:var(--accent);color:#17220c;font-weight:700}
+button.danger{color:#ffaaa9}
+.buttons{display:flex;gap:7px;flex-wrap:wrap}
+.tools{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.tools button{text-align:left}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stage{
+  background:#0b0e14;border:1px solid var(--line);border-radius:12px;
+  padding:12px;overflow:hidden;
+}
+#canvas{
+  display:block;width:100%;height:auto;max-height:68vh;
+  touch-action:none;user-select:none;background:#131a26;
+}
+.canvasbar{display:flex;justify-content:space-between;gap:10px;margin-bottom:12px}
+.check{display:flex;align-items:center;gap:7px;margin:0}
+.check input{width:auto}
+.output{min-height:210px;font:13px/1.65 ui-monospace,monospace}
+.tabs{display:flex;gap:8px;margin-bottom:12px}
+.tabs button.active{border-color:var(--accent);color:var(--accent)}
+#layers{display:flex;flex-direction:column;gap:6px}
+.layer{display:flex;align-items:center;gap:6px}
+.layer button:first-child{
+  flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.layer.active button:first-child{border-color:var(--accent)}
+.layer span{font-size:11px;color:var(--muted)}
+.hidden{display:none!important}
+.note{padding:10px 12px;background:#222c21;border-radius:9px;color:#d0e8ba}
+#status{min-height:20px;color:var(--accent);font-size:12px;margin-top:8px}
+hr{border:0;border-top:1px solid var(--line);margin:16px 0}
+@media(max-width:1150px){
+  .layout{grid-template-columns:240px minmax(320px,1fr)}
+  .right{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:15px}
+}
+@media(max-width:720px){
+  header{padding:15px;align-items:flex-start;flex-direction:column}
+  .layout{display:flex;flex-direction:column;padding:10px}
+  .center{order:0}.left{order:1}.right{order:2;display:block}
+  #canvas{max-height:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="badge">STREET PHOTO · LOCAL PROTOTYPE</div>
+    <h1>Схема кадра</h1>
+    <p class="small">Расставьте элементы. Опишите момент. Соберите промпт.</p>
+  </div>
+  <div class="buttons">
+    <button id="preset">Пример: за стеклом</button>
+    <button id="save">Сохранить</button>
+    <button id="exportSvg">Скачать SVG</button>
+    <button id="clear">Очистить схему</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="left">
+    <section class="panel">
+      <h2>1. История</h2>
+      <label for="scene">Сюжет / место — EN</label>
+      <textarea id="scene" rows="4"></textarea>
+      <p class="small">Например: A quiet street outside a café at dusk.</p>
+
+      <label for="ratio">Формат кадра</label>
+      <select id="ratio">
+        <option value="3:2">3:2 — горизонтальный</option>
+        <option value="4:5">4:5 — вертикальный</option>
+        <option value="1:1">1:1 — квадрат</option>
+        <option value="16:9">16:9 — широкий</option>
+        <option value="65:24">65:24 — панорама</option>
+      </select>
+
+      <label for="mood">Настроение</label>
+      <select id="mood">
+        <option value="quiet urban solitude">Городское одиночество</option>
+        <option value="warm everyday nostalgia">Тёплая ностальгия</option>
+        <option value="restless urban energy">Энергия улицы</option>
+        <option value="tense nocturnal mystery">Ночной нуар</option>
+        <option value="calm observational documentary">Спокойный документ</option>
+      </select>
+    </section>
+
+    <section class="panel">
+      <h2>2. Добавить в кадр</h2>
+      <div class="tools" id="tools">
+        <button data-add="person">＋ Герой</button>
+        <button data-add="building">＋ Фон / здание</button>
+        <button data-add="frame">＋ Рама / окно</button>
+        <button data-add="occluder">＋ Препятствие</button>
+        <button data-add="light">＋ Свет</button>
+      </div>
+      <p class="small" style="margin-top:10px">
+        Перетаскивайте объекты на холсте. Глубина задаётся отдельно —
+        высота объекта на схеме не определяет его план.
+      </p>
+    </section>
+
+    <section class="panel">
+      <h2>3. Фотографическое решение</h2>
+
+      <label for="lens">Оптика — эквивалент 35 мм</label>
+      <select id="lens">
+        <option value="28">28 мм — широкий угол</option>
+        <option value="35">35 мм — контекст и герой</option>
+        <option value="50">50 мм — спокойное кадрирование</option>
+        <option value="85">85 мм — выделение героя</option>
+        <option value="135">135 мм — удалённое наблюдение</option>
+      </select>
+
+      <label for="height">Высота камеры</label>
+      <select id="height">
+        <option value="eye-level viewpoint">Уровень глаз</option>
+        <option value="hip-level viewpoint">От бедра</option>
+        <option value="low viewpoint near the pavement">У земли</option>
+        <option value="elevated viewpoint from a second-floor window">Из окна второго этажа</option>
+        <option value="high viewpoint from a bridge">С моста</option>
+      </select>
+
+      <label for="distance">Дистанция до главного героя</label>
+      <select id="distance">
+        <option value="about one meter">Около 1 м</option>
+        <option value="about three meters">Около 3 м</option>
+        <option value="about five meters">Около 5 м</option>
+        <option value="across the street">Через улицу</option>
+        <option value="across a large square">Через площадь</option>
+      </select>
+
+      <label for="focus">Резкость</label>
+      <select id="focus">
+        <option value="deep">Все основные планы читаемы</option>
+        <option value="subject">Герой резкий, фон мягкий</option>
+        <option value="middle">Резкость в среднем плане</option>
+      </select>
+
+      <label for="time">Время / окружающий свет</label>
+      <select id="time">
+        <option value="blue hour with cool ambient skylight">Синий час</option>
+        <option value="golden hour with low warm sunlight">Золотой час</option>
+        <option value="overcast daytime with soft diffuse skylight">Пасмурный день</option>
+        <option value="midday with hard overhead sunlight">Жёсткий полдень</option>
+        <option value="deep night with dark surroundings">Глухая ночь</option>
+      </select>
+
+      <label for="weather">Атмосфера</label>
+      <select id="weather">
+        <option value="light drizzle and wet pavement reflections">Морось, мокрый асфальт</option>
+        <option value="clear dry air">Сухой воздух</option>
+        <option value="dense fog separating the visible planes">Туман</option>
+        <option value="falling snow and muted distant detail">Снегопад</option>
+        <option value="backlit steam rising from a street vent">Пар из люка</option>
+      </select>
+
+      <label for="film">Эстетика изображения</label>
+      <select id="film">
+        <option value="portra">Portra 400 — тёплый приглушённый цвет</option>
+        <option value="cinestill">CineStill 800T — ночной цвет, ореолы</option>
+        <option value="trix">Tri-X — контрастный ч/б</option>
+        <option value="hp5">HP5 — мягкий ч/б</option>
+        <option value="gold">Gold 200 — тёплый бытовой цвет</option>
+        <option value="digital">Цифра — сдержанная обработка</option>
+      </select>
+
+      <label for="imperfection">Дополнительное несовершенство</label>
+      <select id="imperfection">
+        <option value="">Без дополнительного эффекта</option>
+        <option value="a slightly tilted handheld frame">Лёгкий наклон кадра</option>
+        <option value="slight motion blur on moving pedestrians">Лёгкий смаз прохожих</option>
+        <option value="small raindrops on the lens softly distorting highlights">Капли на линзе</option>
+      </select>
+    </section>
+  </aside>
+
+  <main class="center">
+    <section class="panel">
+      <div class="canvasbar">
+        <h2>Расстановка кадра</h2>
+        <label class="check"><input id="grid" type="checkbox" checked> Сетка третей</label>
+      </div>
+      <div class="stage">
+        <svg id="canvas" xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 1000 666.67" role="img"
+          aria-label="Интерактивная схема композиции"></svg>
+      </div>
+      <p class="small" style="margin-top:10px">
+        Это схема композиции, не предпросмотр генерации.
+        Стрелка у героя обозначает движение, у лампы — направление света в плоскости кадра.
+      </p>
+    </section>
+
+    <section class="panel">
+      <h2>Промпт</h2>
+      <div class="tabs">
+        <button id="tabMJ" class="active">Midjourney</button>
+        <button id="tabNB">Nano Banana</button>
+      </div>
+      <textarea id="output" class="output" readonly aria-label="Собранный промпт"></textarea>
+      <div class="buttons" style="margin-top:10px">
+        <button id="copy" class="primary">Копировать промпт</button>
+        <button id="downloadPrompt">Скачать TXT</button>
+      </div>
+      <div id="status" role="status" aria-live="polite"></div>
+      <p class="small">
+        Точная геометрия не гарантируется текстовым промптом.
+        Параметр --ar добавляется только в версию Midjourney.
+        Для Nano Banana пропорции описаны текстом: при необходимости выставьте их также в интерфейсе генератора.
+      </p>
+    </section>
+    <section class="panel">
+      <h2>Проверка замысла</h2>
+      <div id="warnings" class="small"></div>
+    </section>
+  </main>
+
+  <aside class="right">
+    <section class="panel">
+      <h2>Выбранный объект</h2>
+      <div id="emptyEditor" class="small">Нажмите на объект или добавьте новый.</div>
+      <div id="editor" class="hidden">
+        <label for="objText">Описание для промпта — EN</label>
+        <textarea id="objText" rows="3"></textarea>
+        <label for="objDepth">План</label>
+        <select id="objDepth">
+          <option value="foreground">Передний</option>
+          <option value="midground">Средний</option>
+          <option value="background">Задний</option>
+        </select>
+        <label for="objSize">Размер на схеме</label>
+        <input id="objSize" type="range" min="25" max="170" value="80">
+
+        <div class="row">
+          <div>
+            <label for="objX">X, % слева</label>
+            <input id="objX" type="number" min="0" max="100" step="1">
+          </div>
+          <div>
+            <label for="objY">Y, % сверху</label>
+            <input id="objY" type="number" min="0" max="100" step="1">
+          </div>
+        </div>
+
+        <div id="directionGroup">
+          <label for="objDirection" id="directionLabel">Направление</label>
+          <select id="objDirection">
+            <option value="none">Без направления / стоит</option>
+            <option value="left">Влево</option>
+            <option value="right">Вправо</option>
+            <option value="up">Вверх</option>
+            <option value="down">Вниз</option>
+          </select>
+        </div>
+
+        <div class="buttons" style="margin-top:15px">
+          <button id="duplicate">Дублировать</button>
+          <button id="delete" class="danger">Удалить</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Объекты кадра</h2>
+      <div id="layers"></div>
+      <hr>
+      <p class="small">
+        Порядок перекрытия: задний → средний → передний план.
+        При одинаковом плане более поздний объект рисуется поверх.
+        Источники света показаны условными значками.
+      </p>
+      <div class="note" style="margin-top:14px">
+        Подсказка: начните с героя и одного композиционного приёма.
+        Затем добавьте свет и атмосферу.
+      </div>
+    </section>
+  </aside>
+</div>
+
+<script>
+"use strict";
+
+const $ = id => document.getElementById(id);
+const SVG_NS = "http://www.w3.org/2000/svg";
+const KEY = "street-frame-scheme-v1";
+
+const esc = s => String(s).replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const clamp = (n,a,b) => Math.max(a,Math.min(b,n));
+const uid = () => "o" + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+
+const kinds = {
+  person: {name:"Герой", text:"a lone pedestrian in a dark coat", size:65, depth:"midground"},
+  building:{name:"Здание",text:"a quiet apartment building",size:105,depth:"background"},
+  frame:{name:"Рама",text:"a dark café window frame",size:120,depth:"foreground"},
+  occluder:{name:"Препятствие",text:"a blurred foreground silhouette",size:90,depth:"foreground"},
+  light:{name:"Свет",text:"a warm shop-window light",size:50,depth:"background"}
+};
+const depths = {background:0,midground:1,foreground:2};
+const depthNames = {background:"Задний",midground:"Средний",foreground:"Передний"};
+
+const films = {
+  portra:"a Kodak Portra 400-inspired palette, warm muted colors and fine grain",
+  cinestill:"a CineStill 800T-inspired look, cool shadows and restrained red halation around bright highlights",
+  trix:"a Kodak Tri-X-inspired black-and-white image with pronounced grain, deep blacks and strong contrast",
+  hp5:"an Ilford HP5-inspired black-and-white image with gentle contrast and a broad tonal range",
+  gold:"a Kodak Gold 200-inspired palette with warm everyday snapshot colors and visible fine grain",
+  digital:"natural digital rendering with restrained sharpening and believable tonal transitions"
+};
+
+const focusText = {
+  deep:"Keep the main foreground, middle and background subjects legible with broad depth of field",
+  subject:"Keep the main subject sharp and let the background fall softly out of focus",
+  middle:"Focus on the middle plane, with foreground and background softly blurred"
+};
+
+const configKeys = [
+  "scene","ratio","mood","lens","height","distance",
+  "focus","time","weather","film","imperfection"
+];
+
+function makeObject(type, extras={}){
+  return {
+    id:uid(),type,text:kinds[type].text,size:kinds[type].size,
+    depth:kinds[type].depth,x:.5,y:.5,direction:"none",...extras
+  };
+}
+
+function initialState(){
+  return {
+    config:{
+      scene:"A quiet city street seen from inside a café.",
+      ratio:"3:2",mood:"quiet urban solitude",lens:"135",
+      height:"eye-level viewpoint",distance:"across the street",
+      focus:"middle",time:"blue hour with cool ambient skylight",
+      weather:"light drizzle and wet pavement reflections",
+      film:"portra",imperfection:""
+    },
+    objects:[
+      makeObject("building",{x:.68,y:.36,size:110}),
+      makeObject("person",{
+        x:.65,y:.64,size:65,
+        text:"a woman holding a red umbrella, waiting by the curb"
+      }),
+      makeObject("frame",{x:.5,y:.5,size:158}),
+      makeObject("occluder",{
+        x:.15,y:.85,size:64,text:"a softly blurred café chair"
+      }),
+      makeObject("light",{
+        x:.87,y:.36,size:45,direction:"left",
+        text:"warm light spilling from a shop window"
+      })
+    ]
+  };
+}
+
+let state = initialState();
+let selected = null;
+let platform = "mj";
+let drag = null;
+let statusTimer;
+
+try{
+  const saved = JSON.parse(localStorage.getItem(KEY) || "null");
+  if(saved && saved.version===1 && saved.state &&
+      Array.isArray(saved.state.objects) && saved.state.config){
+    const candidate = saved.state;
+    const valid = configKeys.every(k => typeof candidate.config[k] === "string")
+      && candidate.objects.every(o =>
+        o && kinds[o.type] && o.depth in depths &&
+        typeof o.id==="string" && typeof o.text==="string" &&
+        Number.isFinite(o.x) && Number.isFinite(o.y) &&
+        Number.isFinite(o.size) &&
+        o.x>=0 && o.x<=1 && o.y>=0 && o.y<=1 &&
+        o.size>=25 && o.size<=170 &&
+        ["none","left","right","up","down"].includes(o.direction)
+      );
+    if(valid) state = candidate;
+  }
+}catch(e){ /* Local storage may be unavailable. */ }
+
+function syncControls(){
+  for(const k of configKeys){
+    $(k).value = state.config[k];
+    if($(k).tagName==="SELECT" && $(k).selectedIndex<0){
+      $(k).selectedIndex=0;
+      state.config[k]=$(k).value;
+    }
+  }
+}
+syncControls();
+
+function dimensions(){
+  const [w,h] = state.config.ratio.split(":").map(Number);
+  return {w:1000,h:1000*h/w};
+}
+
+function say(text){
+  $("status").textContent=text;
+  clearTimeout(statusTimer);
+  statusTimer=setTimeout(()=>{$("status").textContent="";},4500);
+}
+
+function drawArrow(dir,color,length=75){
+  const ends={left:[-length,0],right:[length,0],up:[0,-length],down:[0,length]};
+  if(!ends[dir]) return "";
+  const [x,y]=ends[dir];
+  const angle=Math.atan2(y,x);
+  const p1=[x-16*Math.cos(angle-.45),y-16*Math.sin(angle-.45)];
+  const p2=[x-16*Math.cos(angle+.45),y-16*Math.sin(angle+.45)];
+  return `<path d="M0 0 L${x} ${y} M${p1[0]} ${p1[1]} L${x} ${y} L${p2[0]} ${p2[1]}"
+    fill="none" stroke="${color}" stroke-width="4" stroke-linecap="round"/>`;
+}
+
+function objectShape(o){
+  const active=o.id===selected;
+  const stroke=active?"#b6f36d":"#a8b6cd";
+  let shape="";
+  if(o.type==="person"){
+    shape=`
+      <circle cx="0" cy="-46" r="18" fill="#f1c08e"/>
+      <path d="M-24 -20 Q0 -33 24 -20 L31 39 L-31 39Z" fill="#7797cc" stroke="${stroke}" stroke-width="2"/>
+      <path d="M-13 39 L-17 72 M13 39 L20 72 M-23 -11 L-40 27 M23 -11 L39 23"
+        stroke="${stroke}" stroke-width="10" stroke-linecap="round"/>
+      ${o.direction!=="none"?`<g transform="translate(0,95)">${drawArrow(o.direction,"#b6f36d",65)}</g>`:""}`;
+  }
+  if(o.type==="building"){
+    shape=`<rect x="-80" y="-95" width="160" height="190" rx="4"
+      fill="#2b3a51" stroke="${stroke}" stroke-width="2"/>`;
+    for(let y=-65;y<70;y+=45){
+      for(let x=-53;x<65;x+=43){
+        shape+=`<rect x="${x}" y="${y}" width="20" height="25" fill="#d2b470" opacity=".7"/>`;
+      }
+    }
+  }
+  if(o.type==="frame"){
+    shape=`<rect x="-170" y="-120" width="340" height="240" rx="3"
+      fill="none" stroke="#070b12" stroke-width="18"/>
+      <rect x="-170" y="-120" width="340" height="240" rx="3"
+      fill="none" stroke="${stroke}" stroke-width="2"/>
+      <path d="M-170 -120 L170 120" stroke="${stroke}" stroke-opacity=".18" stroke-width="2"/>`;
+  }
+  if(o.type==="occluder"){
+    shape=`<ellipse cx="0" cy="0" rx="58" ry="85"
+      fill="#101722" fill-opacity=".9" stroke="${stroke}" stroke-width="2" stroke-dasharray="5 5"/>`;
+  }
+  if(o.type==="light"){
+    shape=`<circle r="29" fill="#ffd886" fill-opacity=".15"/>
+      <circle r="13" fill="#ffd886"/>
+      <path d="M0 -43 V-33 M0 33 V43 M-43 0 H-33 M33 0 H43
+        M-30 -30 L-23 -23 M30 30 L23 23 M-30 30 L-23 23 M30 -30 L23 -23"
+        stroke="#ffd886" stroke-width="3"/>
+      ${drawArrow(o.direction,"#ffd886",115)}`;
+  }
+  return shape;
+}
+
+function draw(){
+  const {w,h}=dimensions();
+  const svg=$("canvas");
+  svg.setAttribute("viewBox",`0 0 ${w} ${h}`);
+  const grid=$("grid").checked
+    ? `<path d="M${w/3} 0 V${h} M${w*2/3} 0 V${h}
+        M0 ${h/3} H${w} M0 ${h*2/3} H${w}"
+        stroke="#b3c4df" stroke-opacity=".22" stroke-dasharray="7 7" fill="none"/>`
+    :"";
+  svg.innerHTML=`
+    <rect width="${w}" height="${h}" fill="#151d2a"/>
+    <rect y="${h*.62}" width="${w}" height="${h*.38}" fill="#1c2937"/>
+    <path d="M0 ${h*.62} H${w}" stroke="#354357"/>
+    ${grid}
+    <text x="18" y="27" fill="#8192ac" font-size="15" font-family="system-ui">
+      СХЕМА · НЕ ПРЕВЬЮ ИЗОБРАЖЕНИЯ
+    </text>`;
+
+  const sorted=[...state.objects].sort((a,b)=>
+    ((a.type==="light"?3:depths[a.depth]) -
+     (b.type==="light"?3:depths[b.depth])));
+  const unit=Math.min(w,h)/650;
+
+  sorted.forEach(o=>{
+    const g=document.createElementNS(SVG_NS,"g");
+    g.dataset.id=o.id;
+    g.style.cursor="grab";
+    g.setAttribute("transform",`translate(${o.x*w},${o.y*h}) scale(${o.size/80*unit})`);
+    g.setAttribute("role","button");
+    g.setAttribute("tabindex","0");
+    g.setAttribute("aria-label",`${kinds[o.type].name}: ${o.text}`);
+    g.innerHTML=`
+      <title>${esc(o.text)}</title>
+      ${objectShape(o)}
+      <text x="0" y="${o.type==="person"?132:o.type==="frame"?148:o.type==="building"?122:112}"
+        text-anchor="middle" fill="${o.id===selected?"#b6f36d":"#c4cee0"}"
+        font-size="17" font-family="system-ui" paint-order="stroke"
+        stroke="#101722" stroke-width="4" stroke-linejoin="round">${esc(kinds[o.type].name)}</text>`;
+    svg.appendChild(g);
+  });
+}
+
+function renderLayers(){
+  const box=$("layers");
+  box.innerHTML="";
+  if(!state.objects.length){
+    box.textContent="Схема пустая. Добавьте героя.";
+    return;
+  }
+  state.objects.forEach(o=>{
+    const row=document.createElement("div");
+    row.className="layer"+(selected===o.id?" active":"");
+    const b=document.createElement("button");
+    b.textContent=`${kinds[o.type].name} · ${o.text}`;
+    b.title=o.text;
+    b.onclick=()=>select(o.id);
+    const d=document.createElement("span");
+    d.textContent=depthNames[o.depth];
+    row.append(b,d);
+    box.appendChild(row);
+  });
+}
+
+function current(){return state.objects.find(o=>o.id===selected)}
+
+function syncEditor(){
+  const o=current();
+  $("editor").classList.toggle("hidden",!o);
+  $("emptyEditor").classList.toggle("hidden",!!o);
+  if(!o)return;
+  $("objText").value=o.text;
+  $("objDepth").value=o.depth;
+  $("objSize").value=o.size;
+  $("objX").value=Math.round(o.x*100);
+  $("objY").value=Math.round(o.y*100);
+  $("objDirection").value=o.direction;
+  $("directionGroup").classList.toggle("hidden",!["person","light"].includes(o.type));
+  $("directionLabel").textContent=o.type==="light"
+    ?"Направление света на схеме":"Движение в плоскости кадра";
+}
+
+function select(id){
+  selected=id;
+  draw();renderLayers();syncEditor();
+}
+
+function positionText(o){
+  const horizontal=o.x<.35?"left third":o.x>.65?"right third":"central third";
+  const vertical=o.y<.34?"upper part":o.y>.67?"lower part":"middle height";
+  return `${horizontal} of the frame, in its ${vertical}`;
+}
+
+function objectDescription(o){
+  const label=o.text.trim() || kinds[o.type].text;
+  let t=`Place ${label} in the ${o.depth}, at the ${positionText(o)}`;
+  if(o.type==="person"){
+    const movement={
+      left:"moving toward the left edge",
+      right:"moving toward the right edge",
+      up:"moving toward the top of the image",
+      down:"moving toward the bottom of the image"
+    };
+    if(movement[o.direction]) t+=`, ${movement[o.direction]}`;
+    t+=o.size<50?", occupying a small part of the image"
+      :o.size>115?", occupying a large part of the image":"";
+  }
+  if(o.type==="frame"){
+    t+="; use this element as a visible frame-within-the-frame around the street scene";
+  }
+  if(o.type==="occluder"){
+    t+="; it partially obstructs the view without fully hiding the main subject";
+  }
+  if(o.type==="light"){
+    t=`Position ${label} at the ${positionText(o)}`;
+    const direction={
+      left:"direct its light toward the left side of the image",
+      right:"direct its light toward the right side of the image",
+      up:"direct its light upward in the image",
+      down:"direct its light downward in the image"
+    };
+    if(direction[o.direction])t+=`; ${direction[o.direction]}`;
+    t+=". Treat the diagram symbol as a lighting instruction, not a graphic to draw";
+  }
+  return t+".";
+}
+
+function buildPrompts(){
+  const c=state.config;
+  const order={person:0,building:1,frame:2,occluder:3,light:4};
+  const ordered=[...state.objects].sort((a,b)=>order[a.type]-order[b.type]);
+  const layout=ordered.map(objectDescription).join(" ");
+  const scene=c.scene.trim() || "An everyday urban street scene.";
+  const camera=`Use a ${c.height}, observing the main subject from ${c.distance}, with a ${c.lens}mm full-frame-equivalent field of view.`;
+  const atmosphere=`The scene is set at ${c.time}, with ${c.weather}.`;
+  const look=`Render ${films[c.film]}.`;
+  const focus=focusText[c.focus]+".";
+  const extra=c.imperfection?`Include ${c.imperfection}.`:"";
+  const finish=`The mood is ${c.mood}. Keep the result candid, unposed and photographically plausible.`;
+  const blocks=[scene,layout,camera,focus,atmosphere,look,extra,finish].filter(Boolean);
+
+  return {
+    mj:["Candid street photograph.",...blocks,`--ar ${c.ratio}`].join(" "),
+    nb:[
+      "Create a candid documentary-style street photograph.",
+      ...blocks,
+      `Compose the image in a ${c.ratio} aspect ratio.`,
+      "Translate the layout into a real photographic scene; do not include diagram labels, arrows or construction guides."
+    ].join(" ")
+  };
+}
+
+function updateOutput(){
+  const prompts=buildPrompts();
+  $("output").value=prompts[platform];
+  $("tabMJ").classList.toggle("active",platform==="mj");
+  $("tabNB").classList.toggle("active",platform==="nb");
+
+  const notes=[];
+  const people=state.objects.filter(o=>o.type==="person");
+  const lights=state.objects.filter(o=>o.type==="light");
+
+  if(!people.length)notes.push("Нет героя: это допустимо для пустой улицы или следов человеческого присутствия.");
+  if(lights.length>2)notes.push("Больше двух источников света: обозначьте доминирующий источник в его описании.");
+  if(state.objects.length>7)notes.push("Много объектов: модель может упростить композицию. Попробуйте оставить главное.");
+  if(state.config.focus==="middle" && !state.objects.some(o=>o.type!=="light"&&o.depth==="midground")){
+    notes.push("Выбрана резкость среднего плана, но в нём нет объектов.");
+  }
+  const allText=state.config.scene+" "+state.objects.map(o=>o.text).join(" ");
+  if(/[а-яё]/i.test(allText)){
+    notes.push("В свободных описаниях есть русский текст. Он останется в промпте: встроенного перевода нет.");
+  }
+  if(["trix","hp5"].includes(state.config.film) &&
+     /\b(red|blue|green|yellow|magenta|cyan|orange)\b/i.test(allText)){
+    notes.push("Выбран ч/б, но в описаниях есть цвет. Если нужен видимый цветовой акцент, явно задайте выборочное окрашивание или смените эстетику.");
+  }
+  notes.push("Размеры и позиции переводятся в словесные ориентиры, а не в точные координаты генератора.");
+  $("warnings").replaceChildren(...notes.map(t=>{
+    const p=document.createElement("p");
+    p.textContent="• "+t;
+    return p;
+  }));
+}
+
+function refresh(){
+  draw();renderLayers();syncEditor();updateOutput();
+}
+
+for(const key of configKeys){
+  $(key).addEventListener("input",()=>{
+    state.config[key]=$(key).value;
+    draw();updateOutput();
+  });
+}
+$("grid").onchange=draw;
+
+$("tools").onclick=e=>{
+  const b=e.target.closest("[data-add]");
+  if(!b)return;
+  const o=makeObject(b.dataset.add,{
+    x:clamp(.45+Math.random()*.15,0,1),
+    y:clamp(.45+Math.random()*.15,0,1)
+  });
+  state.objects.push(o);
+  selected=o.id;
+  refresh();
+};
+
+const propertyBindings={
+  objText:["text",v=>v],
+  objDepth:["depth",v=>v],
+  objSize:["size",v=>clamp(Number(v),25,170)],
+  objX:["x",v=>clamp(Number(v)/100,0,1)],
+  objY:["y",v=>clamp(Number(v)/100,0,1)],
+  objDirection:["direction",v=>v]
+};
+
+Object.entries(propertyBindings).forEach(([id,[key,convert]])=>{
+  $(id).addEventListener("input",()=>{
+    const o=current();if(!o)return;
+    o[key]=convert($(id).value);
+    draw();renderLayers();updateOutput();
+  });
+});
+
+$("delete").onclick=()=>{
+  state.objects=state.objects.filter(o=>o.id!==selected);
+  selected=null;refresh();
+};
+$("duplicate").onclick=()=>{
+  const o=current();if(!o)return;
+  const copy={...o,id:uid(),x:clamp(o.x+.06,.02,.98),y:clamp(o.y+.04,.02,.98)};
+  state.objects.push(copy);selected=copy.id;refresh();
+};
+
+function canvasPoint(e){
+  const svg=$("canvas");
+  const p=svg.createSVGPoint();
+  p.x=e.clientX;p.y=e.clientY;
+  const matrix=svg.getScreenCTM();
+  return matrix?p.matrixTransform(matrix.inverse()):null;
+}
+
+$("canvas").addEventListener("pointerdown",e=>{
+  const g=e.target.closest("[data-id]");
+  if(!g){select(null);return}
+  e.preventDefault();
+  const p=canvasPoint(e);if(!p)return;
+  const o=state.objects.find(x=>x.id===g.dataset.id);
+  const {w,h}=dimensions();
+  selected=o.id;
+  drag={id:o.id,dx:p.x-o.x*w,dy:p.y-o.y*h,pointerId:e.pointerId};
+  $("canvas").setPointerCapture(e.pointerId);
+  draw();renderLayers();syncEditor();
+});
+
+$("canvas").addEventListener("pointermove",e=>{
+  if(!drag || e.pointerId!==drag.pointerId)return;
+  const p=canvasPoint(e);if(!p)return;
+  const o=state.objects.find(x=>x.id===drag.id);
+  if(!o)return;
+  const {w,h}=dimensions();
+  o.x=clamp((p.x-drag.dx)/w,0,1);
+  o.y=clamp((p.y-drag.dy)/h,0,1);
+  draw();syncEditor();updateOutput();
+});
+
+function endDrag(){drag=null}
+$("canvas").addEventListener("pointerup",endDrag);
+$("canvas").addEventListener("pointercancel",endDrag);
+$("canvas").addEventListener("lostpointercapture",endDrag);
+
+$("canvas").addEventListener("keydown",e=>{
+  const g=e.target.closest("[data-id]");
+  if(g && (e.key==="Enter"||e.key===" ")){
+    e.preventDefault();select(g.dataset.id);
+  }
+});
+
+$("tabMJ").onclick=()=>{platform="mj";updateOutput()};
+$("tabNB").onclick=()=>{platform="nb";updateOutput()};
+
+$("copy").onclick=async()=>{
+  const text=$("output").value;
+  try{
+    if(!navigator.clipboard)throw new Error("Clipboard unavailable");
+    await navigator.clipboard.writeText(text);
+    say("Промпт скопирован.");
+  }catch(e){
+    $("output").focus();$("output").select();
+    say("Текст выделен. Нажмите Ctrl+C или Cmd+C.");
+  }
+};
+
+function download(name,text,type){
+  const blob=new Blob([text],{type});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download=name;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+
+$("downloadPrompt").onclick=()=>{
+  download(`street-prompt-${platform}.txt`,$("output").value,"text/plain;charset=utf-8");
+};
+
+$("save").onclick=()=>{
+  try{
+    localStorage.setItem(KEY,JSON.stringify({version:1,state}));
+    say("Проект сохранён в этом браузере.");
+  }catch(e){
+    download("frame-project.json",JSON.stringify({version:1,state},null,2),"application/json");
+    say("Хранилище браузера недоступно. Скачана резервная копия JSON.");
+  }
+};
+
+$("exportSvg").onclick=()=>{
+  const old=selected;
+  selected=null;draw();
+  const clone=$("canvas").cloneNode(true);
+  const {w,h}=dimensions();
+  clone.setAttribute("width",w);
+  clone.setAttribute("height",h);
+  clone.querySelectorAll("[data-id]").forEach(g=>{
+    g.removeAttribute("tabindex");
+    g.removeAttribute("role");
+    g.removeAttribute("style");
+  });
+  const xml=new XMLSerializer().serializeToString(clone);
+  selected=old;draw();
+  download("frame-scheme.svg",xml,"image/svg+xml;charset=utf-8");
+};
+
+$("preset").onclick=()=>{
+  if(!confirm("Заменить текущий проект примером «За стеклом»?"))return;
+  state=initialState();selected=null;
+  syncControls();refresh();say("Пример загружен. Для сохранения нажмите «Сохранить».");
+};
+$("clear").onclick=()=>{
+  if(!confirm("Удалить все объекты? Настройки съёмки останутся."))return;
+  state.objects=[];selected=null;refresh();
+};
+
+refresh();
+</script>
+</body>
+</html>
